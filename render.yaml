@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tom-jain-world
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "10000"
