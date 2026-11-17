@@ -110,6 +110,7 @@ function calcNearest(player) {
   else ui.prompt.textContent = `E  ·  Buy ${nearest.item.name}  ·  ${nearest.item.cost} coins`;
 }
 function collides(x,y) {
+  if (me()?.inside) return false;
   const r=15;
   return buildings.some(b => x+r>b.x && x-r<b.x+b.w && y+r>b.y && y-r<b.y+b.h);
 }
@@ -176,6 +177,7 @@ function drawWorld() {
   });
   // players
   players.forEach((pl,index)=>{
+    if(pl.inside)return;
     const col=pl.id===myId?"#527e61":"#bf735b";
     ctx.fillStyle="#17231e30";ctx.beginPath();ctx.ellipse(pl.x,pl.y+15,13,5,0,0,Math.PI*2);ctx.fill();
     ctx.fillStyle=col;ctx.beginPath();ctx.arc(pl.x,pl.y,12,0,Math.PI*2);ctx.fill();
