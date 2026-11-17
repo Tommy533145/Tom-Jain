@@ -1,40 +1,47 @@
 # Two Keys, One City
 
-A tiny browser city for two people to explore together. Create a private room, share its eight-character code, pick up work around town, earn coins, and buy homes for your couple.
+A small third-person 3D city for two partners. Explore together, take local jobs, earn coins, buy homes, go inside, and decorate a shared place. Godot renders the game; Python runs the room server and saves couple progress.
 
-The Python browser game lives in `game/`. The original Godot prototype remains in `godot/`.
+## Run the game locally
 
-## Play locally
+Requirements: Godot 4.3+ and Python 3.10+.
 
-Requires Python 3.10 or newer.
+Start the Python server from the repository root:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn game.server:app --reload
+uvicorn game.server:app --host 0.0.0.0 --port 8000
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in two browser windows. One person creates a city and shares the room code; the other joins with that code. Your browser keeps a private player key so you can return to your saved room. For a second person on another computer, expose the local service securely or deploy it to Render.
+In another terminal, launch the Godot project:
 
-## How to play
+```powershell
+godot --path godot
+```
 
-- Move with WASD; use E near a green work marker or gold home sign.
-- Work shifts pay 15 or 20 coins and have an eight-second cooldown.
-- Homes cost 80–220 coins and are shared by the couple. Enter a purchased home to add décor with coins.
-- Each room supports two players. Movement, work rewards, and property purchases are checked by the Python server.
-- Room codes, home ownership, and each player's coins are saved in a local SQLite database and survive disconnects and process restarts. A public host must mount persistent storage at `TWO_KEYS_DATA_DIR` to keep saves across redeploys.
+In the game, keep the server URL as `ws://127.0.0.1:8000/ws`. One partner selects **Create our city** and shares the eight-character code; the other enters that code and selects **Join with code**.
 
-## Deploy on Render
+## Play
 
-The repository includes a Docker-based Blueprint. Create a Render service from `render.yaml`; it listens on Render's `PORT` and exposes a `/health` endpoint. Use the service's HTTPS URL in a browser; the client automatically uses secure WebSockets.
+- WASD: walk
+- Mouse: look around
+- E: take a nearby job, buy or enter a home, add décor, or leave the interior
+- Esc: release the mouse; click to capture it again
 
-The free instance may sleep when idle. SQLite saves survive process restarts on a persistent disk; configure `TWO_KEYS_DATA_DIR` to the mounted disk path before redeploying.
+Jobs pay coins, and completing the same kind of job together grants a couple bonus. Homes and décor are shared by the room. The Python server checks purchases, job rewards, movement rate, and city collisions.
+
+## Play online
+
+Run the Python service on a public WebSocket host and set the Godot URL to `wss://your-host/ws`. Render's Docker Blueprint is included as a starting point. For saves to survive redeploys, mount persistent storage and set `TWO_KEYS_DATA_DIR` to its path.
+
+A temporary public demo may use a Cloudflare Quick Tunnel, but the URL only works while the host computer and tunnel process remain online.
+
+## Saves
+
+SQLite stores room codes, player coin balances, home ownership, and décor in `game/data/two_keys.sqlite3` by default. Set `TWO_KEYS_DATA_DIR` to move the database to a persistent volume.
 
 ## Current scope
 
-This is a playable first slice with a top-down city, private two-player rooms with persistent progress, realtime movement, jobs with a pair bonus, a coin wallet, four buyable enterable homes, and collectible décor. It does not yet include platform accounts, matchmaking, moderation, chat, or production load testing. The browser client is custom canvas art inspired by open-world city games; it does not use GTA assets.
-
-## Original Godot prototype
-
-The earlier Godot project is in `godot/` and can be opened with Godot 4.3+. It remains available as a separate prototype.
+This is a playable 3D vertical slice with a procedural city, third-person movement, two-player rooms, jobs, a coin wallet, enterable homes, and shared décor. It is an original small prototype, not a recreation of GTA 6; it still needs richer character and city art, more activities, platform accounts, moderation, and production load testing.
