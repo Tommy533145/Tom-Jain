@@ -236,6 +236,18 @@ function frame(now){
 document.querySelector("#createButton").onclick=()=>connect("create");
 document.querySelector("#joinButton").onclick=()=>connect("join",ui.code.value.trim().toUpperCase());
 document.querySelector("#leaveButton").onclick=()=>{ws?.close();location.reload();};
+document.querySelector("#copyCode").onclick=async()=>{
+  try { await navigator.clipboard.writeText(roomCode); showToast("Invite code copied — send it to your person."); }
+  catch { showToast("Your invite code is " + roomCode); }
+};
+document.querySelectorAll(".touch-controls [data-key]").forEach(button=>{
+  const key=button.dataset.key;
+  button.addEventListener("pointerdown",event=>{event.preventDefault();button.setPointerCapture(event.pointerId);keys.add(key);});
+  const release=event=>{event.preventDefault();keys.delete(key);};
+  button.addEventListener("pointerup",release);
+  button.addEventListener("pointercancel",release);
+  button.addEventListener("lostpointercapture",()=>keys.delete(key));
+});
 document.addEventListener("keydown",e=>{
   const key=e.key.toLowerCase();
   if(["w","a","s","d","e","arrowup","arrowdown","arrowleft","arrowright"].includes(key))e.preventDefault();
