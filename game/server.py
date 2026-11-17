@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
+import os
+import re
 import secrets
+import sqlite3
 import string
 import time
 from dataclasses import dataclass, field
@@ -15,12 +19,15 @@ from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
+DATA_DIR = Path(os.environ.get("TWO_KEYS_DATA_DIR", str(ROOT / "data")))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DATA_DIR / "two_keys.sqlite3"
 CITY_W = 1600
 CITY_H = 1100
 MAX_PLAYERS = 2
 MOVE_SPEED = 230.0
 MOVE_INTERVAL = 1 / 24
-ROOM_ALPHABET = string.ascii_uppercase + string.digits
+ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 JOBS = [
     {"id": "cafe", "name": "Cafe shift", "x": 250, "y": 305, "reward": 15},
@@ -35,10 +42,18 @@ HOMES = [
     {"id": "penthouse", "name": "Skyline Flat", "x": 1110, "y": 850, "cost": 220},
 ]
 
+with sqlite3.connect(DB_PATH) as db:
+    db.execute("CREATE TABLE IF NOT EXISTS couple_rooms (code TEXT PRIMARY KEY, homes_json TEXT NOT NULL, updated_at REAL NOT NULL)")
+    db.execute("""CREATE TABLE IF NOT EXISTS couple_players (
+        room_code TEXT NOT NULL, account_key TEXT NOT NULL, name TEXT NOT NULL, coins INTEGER NOT NULL,
+        updated_at REAL NOT NULL, PRIMARY KEY (room_code, account_key)
+    )""")
+
 
 @dataclass
 class Player:
     id: str
+    account_key: str
     name: str
     socket: WebSocket
     x: float
@@ -54,6 +69,7 @@ class Room:
     code: str
     players: dict[str, Player] = field(default_factory=dict)
     homes: dict[str, str] = field(default_factory=dict)
+    saved_players: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 rooms: dict[str, Room] = {}
@@ -72,8 +88,43 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def load_saved_room(code: str) -> Room | None:
+    with sqlite3.connect(DB_PATH) as db:
+        row = db.execute("SELECT homes_json FROM couple_rooms WHERE code = ?", (code,)).fetchone()
+        if row is None:
+            return None
+        room = Room(code=code, homes=json.loads(row[0]))
+        for account_key, name, coins in db.execute(
+            "SELECT account_key, name, coins FROM couple_players WHERE room_code = ?", (code,)
+        ):
+            room.saved_players[account_key] = {"name": name, "coins": coins}
+        return room
+
+
+def save_room(room: Room) -> None:
+    now = time.time()
+    with sqlite3.connect(DB_PATH) as db:
+        db.execute(
+            "INSERT INTO couple_rooms(code, homes_json, updated_at) VALUES(?, ?, ?) "
+            "ON CONFLICT(code) DO UPDATE SET homes_json=excluded.homes_json, updated_at=excluded.updated_at",
+            (room.code, json.dumps(room.homes), now),
+        )
+        for key, record in room.saved_players.items():
+            db.execute(
+                "INSERT INTO couple_players(room_code, account_key, name, coins, updated_at) VALUES(?, ?, ?, ?, ?) "
+                "ON CONFLICT(room_code, account_key) DO UPDATE SET name=excluded.name, coins=excluded.coins, updated_at=excluded.updated_at",
+                (room.code, key, record["name"], record["coins"], now),
+            )
+        for player in room.players.values():
+            db.execute(
+                "INSERT INTO couple_players(room_code, account_key, name, coins, updated_at) VALUES(?, ?, ?, ?, ?) "
+                "ON CONFLICT(room_code, account_key) DO UPDATE SET name=excluded.name, coins=excluded.coins, updated_at=excluded.updated_at",
+                (room.code, player.account_key, player.name, player.coins, now),
+            )
+
+
 def make_code() -> str:
-    return "".join(secrets.choice(ROOM_ALPHABET) for _ in range(6))
+    return "".join(secrets.choice(ROOM_ALPHABET) for _ in range(8))
 
 
 def room_snapshot(room: Room) -> dict[str, Any]:
@@ -111,32 +162,48 @@ async def broadcast(room: Room, extra: dict[str, Any] | None = None) -> None:
 async def find_or_create_room(request: dict[str, Any], socket: WebSocket) -> tuple[Room | None, Player | None, str | None]:
     action = request.get("type")
     name = str(request.get("name", "Player")).strip()[:20] or "Player"
+    account_key = str(request.get("account", ""))
+    account_key = re.sub(r"[^a-zA-Z0-9_-]", "", account_key)[:80]
+    if len(account_key) < 20:
+        return None, None, "Refresh the game and try again."
+
     async with rooms_lock:
         if action == "create":
             code = make_code()
-            while code in rooms:
-                code = make_code()
+            with sqlite3.connect(DB_PATH) as db:
+                while code in rooms or db.execute("SELECT 1 FROM couple_rooms WHERE code = ?", (code,)).fetchone():
+                    code = make_code()
             room = Room(code=code)
             rooms[code] = room
+            save_room(room)
         elif action == "join":
             code = str(request.get("room", "")).strip().upper()
             room = rooms.get(code)
             if room is None:
-                return None, None, "Room code not found. Ask your partner to create a room first."
+                room = load_saved_room(code)
+                if room is None:
+                    return None, None, "Room code not found. Ask your partner to create a city first."
+                rooms[code] = room
             if len(room.players) >= MAX_PLAYERS:
                 return None, None, "This room already has two players."
         else:
             return None, None, "Choose create room or join with a room code."
 
+        if any(existing.account_key == account_key for existing in room.players.values()):
+            return None, None, "This browser is already connected to this city."
+        saved = room.saved_players.pop(account_key, None)
         player_id = secrets.token_urlsafe(8)
         player = Player(
             id=player_id,
-            name=name,
+            account_key=account_key,
+            name=name if saved is None else saved["name"],
             socket=socket,
-            x=room.players.__len__() * 54 + 770,
+            x=len(room.players) * 54 + 770,
             y=560,
+            coins=35 if saved is None else int(saved["coins"]),
         )
         room.players[player_id] = player
+        save_room(room)
         return room, player, None
 
 
@@ -214,6 +281,7 @@ async def serve_room(socket: WebSocket) -> None:
                     continue
                 player.last_work[job["id"]] = now
                 player.coins += job["reward"]
+                save_room(room)
                 await broadcast(room, {"text": f"{player.name} finished {job['name']} and earned {job['reward']} coins."})
             elif kind == "buy":
                 if player.inside:
@@ -231,6 +299,7 @@ async def serve_room(socket: WebSocket) -> None:
                     continue
                 player.coins -= home["cost"]
                 room.homes[home["id"]] = player.name
+                save_room(room)
                 await broadcast(room, {"text": f"{player.name} bought the {home['name']} for your couple!"})
     except (WebSocketDisconnect, asyncio.TimeoutError):
         pass
@@ -238,6 +307,8 @@ async def serve_room(socket: WebSocket) -> None:
         if room is not None and player is not None:
             async with rooms_lock:
                 room.players.pop(player.id, None)
+                room.saved_players[player.account_key] = {"name": player.name, "coins": player.coins}
+                save_room(room)
                 if not room.players:
                     rooms.pop(room.code, None)
                 else:
