@@ -24,6 +24,11 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "two_keys.sqlite3"
 CITY_W = 1600
 CITY_H = 1100
+CITY_BUILDINGS = [
+    (55, 65, 270, 135), (430, 65, 225, 135), (790, 65, 300, 135), (1160, 65, 370, 135),
+    (55, 345, 270, 255), (430, 345, 225, 255), (790, 345, 300, 255), (1160, 345, 370, 255),
+    (55, 735, 270, 295), (430, 735, 225, 295), (790, 735, 300, 295), (1160, 735, 370, 295),
+]
 MAX_PLAYERS = 2
 MOVE_SPEED = 230.0
 MOVE_INTERVAL = 1 / 24
@@ -151,6 +156,13 @@ def make_code() -> str:
     return "".join(secrets.choice(ROOM_ALPHABET) for _ in range(8))
 
 
+def collides_with_building(x: float, y: float, radius: float = 15.0) -> bool:
+    return any(
+        x + radius > bx and x - radius < bx + bw and y + radius > by and y - radius < by + bh
+        for bx, by, bw, bh in CITY_BUILDINGS
+    )
+
+
 def room_snapshot(room: Room) -> dict[str, Any]:
     return {
         "type": "state",
@@ -225,7 +237,7 @@ async def find_or_create_room(request: dict[str, Any], socket: WebSocket) -> tup
             name=name,
             socket=socket,
             x=len(room.players) * 54 + 770,
-            y=560,
+            y=305,
             coins=35 if saved is None else int(saved["coins"]),
         )
         room.players[player_id] = player
@@ -272,6 +284,8 @@ async def serve_room(socket: WebSocket) -> None:
                     y = min(max(y, 32.0), CITY_H - 32.0)
                 elapsed = min(max(now - player.last_move, 0.0), 0.5)
                 max_distance = MOVE_SPEED * elapsed + 18.0
+                if not player.inside and collides_with_building(x, y):
+                    continue
                 if player.last_move and math.hypot(x - player.x, y - player.y) > max_distance:
                     player.last_move = now
                     continue
