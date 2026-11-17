@@ -46,6 +46,7 @@ class Player:
     coins: int = 35
     last_move: float = 0.0
     last_work: dict[str, float] = field(default_factory=dict)
+    inside: str | None = None
 
 
 @dataclass
@@ -80,7 +81,7 @@ def room_snapshot(room: Room) -> dict[str, Any]:
         "type": "state",
         "room": room.code,
         "players": [
-            {"id": player.id, "name": player.name, "x": player.x, "y": player.y, "coins": player.coins}
+            {"id": player.id, "name": player.name, "x": player.x, "y": player.y, "coins": player.coins, "inside": player.inside}
             for player in room.players.values()
         ],
         "homes": room.homes,
@@ -170,8 +171,12 @@ async def serve_room(socket: WebSocket) -> None:
                     continue
                 if not math.isfinite(x) or not math.isfinite(y):
                     continue
-                x = min(max(x, 32.0), CITY_W - 32.0)
-                y = min(max(y, 32.0), CITY_H - 32.0)
+                if player.inside:
+                    x = min(max(x, 600.0), 1000.0)
+                    y = min(max(y, 390.0), 710.0)
+                else:
+                    x = min(max(x, 32.0), CITY_W - 32.0)
+                    y = min(max(y, 32.0), CITY_H - 32.0)
                 elapsed = min(max(now - player.last_move, 0.0), 0.5)
                 max_distance = MOVE_SPEED * elapsed + 18.0
                 if player.last_move and math.hypot(x - player.x, y - player.y) > max_distance:
@@ -179,7 +184,26 @@ async def serve_room(socket: WebSocket) -> None:
                     continue
                 player.x, player.y, player.last_move = x, y, now
                 await broadcast(room)
+            elif kind == "enter":
+                home = next((item for item in HOMES if item["id"] == message.get("home")), None)
+                if home is None or home["id"] not in room.homes or math.hypot(player.x - home["x"], player.y - home["y"]) > 86:
+                    await send_error(socket, "Walk up to a home your couple owns.")
+                    continue
+                player.inside = home["id"]
+                player.x, player.y, player.last_move = 800.0, 550.0, time.monotonic()
+                await broadcast(room, {"text": f"{player.name} went inside the {home['name']}."})
+            elif kind == "exit":
+                home = next((item for item in HOMES if item["id"] == player.inside), None)
+                if home is None:
+                    await send_error(socket, "You are already outside.")
+                    continue
+                player.inside = None
+                player.x, player.y, player.last_move = float(home["x"]), float(home["y"] + 62), time.monotonic()
+                await broadcast(room, {"text": f"{player.name} stepped back onto the street."})
             elif kind == "work":
+                if player.inside:
+                    await send_error(socket, "Head outside to pick up a shift.")
+                    continue
                 job = next((item for item in JOBS if item["id"] == message.get("job")), None)
                 if job is None or math.hypot(player.x - job["x"], player.y - job["y"]) > 62:
                     await send_error(socket, "Walk up to a job spot first.")
@@ -192,6 +216,9 @@ async def serve_room(socket: WebSocket) -> None:
                 player.coins += job["reward"]
                 await broadcast(room, {"text": f"{player.name} finished {job['name']} and earned {job['reward']} coins."})
             elif kind == "buy":
+                if player.inside:
+                    await send_error(socket, "Head outside to browse homes.")
+                    continue
                 home = next((item for item in HOMES if item["id"] == message.get("home")), None)
                 if home is None or math.hypot(player.x - home["x"], player.y - home["y"]) > 76:
                     await send_error(socket, "Walk up to a home sign to buy that property.")
