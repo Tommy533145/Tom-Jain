@@ -33,9 +33,13 @@
     </section>
 
     <section id="game" class="game hidden">
-      <div class="gamebar"><div><b id="cityTitle">OUR CITY</b><span id="partnerStatus">Waiting for your person…</span></div><div class="player-list" id="playerList"></div></div>
+      <div class="gamebar"><div><b id="cityTitle">OUR CITY</b><span id="partnerStatus">Waiting for your person…</span><button id="copyCode" class="copy-code">Copy invite code</button></div><div class="player-list" id="playerList"></div></div>
       <div class="canvas-wrap"><canvas id="city" width="1000" height="620" aria-label="Explore the city with your partner"></canvas><div id="actionPrompt" class="action-prompt"></div><div id="toast" class="toast"></div></div>
       <footer class="controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</span><span><kbd>E</kbd> Work / enter / buy</span><span>Find green job signs and gold home signs</span><button id="leaveButton">Leave city</button></footer>
+      <div class="touch-controls" aria-label="Touch movement">
+        <button data-key="w" aria-label="Move up">▲</button>
+        <div><button data-key="a" aria-label="Move left">◀</button><button data-key="s" aria-label="Move down">▼</button><button data-key="d" aria-label="Move right">▶</button></div>
+      </div>
     </section>
     <footer class="site-foot">A small shared world. Built for two.</footer>
   </main>
