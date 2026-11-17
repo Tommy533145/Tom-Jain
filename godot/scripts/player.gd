@@ -4,12 +4,15 @@ extends CharacterBody3D
 @export var jump_velocity: float = 5.0
 @export var mouse_sensitivity: float = 0.0025
 
+const STATE_SEND_INTERVAL: float = 1.0 / 15.0
+
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 var camera_pivot: Node3D
 var remote_target_position: Vector3
 var remote_target_yaw: float = 0.0
 var display_name: String = "Player"
 var name_tag: Label3D
+var state_send_accumulator: float = 0.0
 
 func _ready() -> void:
     camera_pivot = $CameraPivot
@@ -38,7 +41,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
     if is_multiplayer_authority():
         _move_local(delta)
-        Network.send_player_state(global_position, rotation.y)
+        state_send_accumulator += delta
+        if state_send_accumulator >= STATE_SEND_INTERVAL:
+            state_send_accumulator = fmod(state_send_accumulator, STATE_SEND_INTERVAL)
+            Network.send_player_state(global_position, rotation.y)
     else:
         global_position = global_position.lerp(remote_target_position, min(delta * 12.0, 1.0))
         rotation.y = lerp_angle(rotation.y, remote_target_yaw, min(delta * 12.0, 1.0))
