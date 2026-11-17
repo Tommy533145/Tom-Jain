@@ -8,10 +8,15 @@ signal status_changed(message: String)
 
 const DEFAULT_PORT: int = 9080
 const MAX_CLIENTS: int = 64
+const MAX_STATE_UPDATES_PER_SECOND: int = 30
+const MAX_PLAYER_SPEED: float = 9.0
+const MOVEMENT_GRACE_DISTANCE: float = 0.25
 var listen_port: int = DEFAULT_PORT
 var player_display_name: String = "Player"
 var known_names: Dictionary = {}
 var known_positions: Dictionary = {}
+var last_state_packet_msec: Dictionary = {}
+var last_valid_state_msec: Dictionary = {}
 
 func _ready() -> void:
     var port_override := OS.get_environment("PORT").strip_edges()
@@ -47,9 +52,15 @@ func connect_to_server(url: String) -> void:
 func _on_peer_connected(peer_id: int) -> void:
     if not multiplayer.is_server():
         return
+    if known_names.size() - 1 >= MAX_CLIENTS:
+        multiplayer.multiplayer_peer.disconnect_peer(peer_id, true)
+        return
     var spawn := Vector3(float((peer_id % 5) * 2), 1, float((peer_id % 7) * 2))
     known_names[peer_id] = "Player %d" % peer_id
     known_positions[peer_id] = spawn
+    var now_msec := Time.get_ticks_msec()
+    last_state_packet_msec[peer_id] = now_msec
+    last_valid_state_msec[peer_id] = now_msec
     spawn_player.rpc(peer_id, known_names[peer_id], spawn)
     for existing_id in known_names.keys():
         if int(existing_id) != peer_id:
@@ -60,6 +71,8 @@ func _on_peer_disconnected(peer_id: int) -> void:
     if multiplayer.is_server():
         known_names.erase(peer_id)
         known_positions.erase(peer_id)
+        last_state_packet_msec.erase(peer_id)
+        last_valid_state_msec.erase(peer_id)
         remove_player.rpc(peer_id)
 
 func _on_connected_to_server() -> void:
@@ -114,9 +127,27 @@ func submit_state(pos: Vector3, yaw: float) -> void:
     var sender := multiplayer.get_remote_sender_id()
     if sender <= 1 or not known_names.has(sender):
         return
+    var now_msec := Time.get_ticks_msec()
+    var last_packet_msec: int = last_state_packet_msec.get(sender, 0)
+    var minimum_interval_msec := int(1000.0 / MAX_STATE_UPDATES_PER_SECOND)
+    if now_msec - last_packet_msec < minimum_interval_msec:
+        return
+    last_state_packet_msec[sender] = now_msec
     _accept_player_state(sender, pos, yaw)
 
 func _accept_player_state(peer_id: int, pos: Vector3, yaw: float) -> void:
+    if not pos.is_finite() or not is_finite(yaw):
+        return
+    var now_msec := Time.get_ticks_msec()
+    if peer_id != 1:
+        var previous_position: Vector3 = known_positions.get(peer_id, pos)
+        var previous_msec: int = last_valid_state_msec.get(peer_id, now_msec)
+        var elapsed_seconds := clampf(float(now_msec - previous_msec) / 1000.0, 0.0, 1.0)
+        var allowed_distance := MAX_PLAYER_SPEED * elapsed_seconds + MOVEMENT_GRACE_DISTANCE
+        if pos.distance_to(previous_position) > allowed_distance:
+            last_valid_state_msec[peer_id] = now_msec
+            return
+        last_valid_state_msec[peer_id] = now_msec
     var safe_pos := Vector3(clampf(pos.x, -90.0, 90.0), clampf(pos.y, -5.0, 35.0), clampf(pos.z, -90.0, 90.0))
     var safe_yaw := wrapf(yaw, -PI, PI)
     known_positions[peer_id] = safe_pos
