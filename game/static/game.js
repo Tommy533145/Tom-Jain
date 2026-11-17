@@ -12,6 +12,11 @@ const ui = {
 const WORLD = {w:1600,h:1100};
 const keys = new Set();
 let ws = null, roomCode = "", myId = "", players = [], homes = {}, jobs = [], properties = [];
+let accountKey = localStorage.getItem("twoKeysAccountKey");
+if (!accountKey) {
+  accountKey = crypto.randomUUID();
+  localStorage.setItem("twoKeysAccountKey", accountKey);
+}
 let lastSend = 0, lastFrame = 0, nearest = null, toastTimer = 0;
 const buildings = [
   {x:55,y:65,w:270,h:135,c:"#d4c4a7",n:"MARKET STREET"},
@@ -33,7 +38,7 @@ function connect(kind, code="") {
   ui.message.textContent = "Connecting to your city…";
   const scheme = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${scheme}//${location.host}/ws`);
-  ws.onopen = () => ws.send(JSON.stringify({type:kind, room:code, name:ui.name.value.trim() || "Player"}));
+  ws.onopen = () => ws.send(JSON.stringify({type:kind, room:code, name:ui.name.value.trim() || "Player", account:accountKey}));
   ws.onmessage = event => {
     const data = JSON.parse(event.data);
     if (data.type === "error") {
@@ -44,7 +49,7 @@ function connect(kind, code="") {
     if (data.type === "welcome") {
       roomCode = data.room; myId = data.player;
       ui.lobby.classList.add("hidden"); ui.game.classList.remove("hidden");
-      ui.badge.textContent = roomCode; ui.connection.textContent = "City connected";
+      ui.badge.textContent = roomCode; ui.connection.textContent = "City connected"; ui.code.value = roomCode;
       ui.dot.classList.add("online"); ui.title.textContent = "ROOM " + roomCode;
     }
     if (data.type === "state") {
@@ -239,5 +244,5 @@ document.addEventListener("keydown",e=>{
 });
 document.addEventListener("keyup",e=>keys.delete(e.key.toLowerCase()));
 window.addEventListener("blur",()=>keys.clear());
-ui.code.addEventListener("input",()=>ui.code.value=ui.code.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6));
+ui.code.addEventListener("input",()=>ui.code.value=ui.code.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8));
 requestAnimationFrame(frame);
