@@ -110,7 +110,7 @@ func _build_city() -> void:
     add_child(city_root)
     players_root = Node3D.new()
     players_root.name = "Players"
-    city_root.add_child(players_root)
+    add_child(players_root)
 
     _make_box(city_root, "Ground", Vector3(80, -0.35, 55), Vector3(160, 0.7, 110), Color("#819678"))
     _make_box(city_root, "North Road", Vector3(80, 0.01, 30.5), Vector3(160, 0.08, 7.2), Color("#343a39"))
