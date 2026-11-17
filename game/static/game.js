@@ -37,7 +37,8 @@ function connect(kind, code="") {
   ws.onmessage = event => {
     const data = JSON.parse(event.data);
     if (data.type === "error") {
-      ui.message.textContent = data.message; ui.message.classList.add("error");
+      if (!ui.game.classList.contains("hidden")) showToast(data.message);
+      else { ui.message.textContent = data.message; ui.message.classList.add("error"); }
       return;
     }
     if (data.type === "welcome") {
@@ -83,12 +84,18 @@ function showToast(text) {
 }
 function dist(a,b) { return Math.hypot(a.x-b.x,a.y-b.y); }
 function interact() {
-  if (!nearest || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const player = me();
+  if (player?.inside) { ws.send(JSON.stringify({type:"exit"})); return; }
+  if (!nearest) return;
   if (nearest.type === "job") ws.send(JSON.stringify({type:"work",job:nearest.item.id}));
+  else if (homes[nearest.item.id]) ws.send(JSON.stringify({type:"enter",home:nearest.item.id}));
   else ws.send(JSON.stringify({type:"buy",home:nearest.item.id}));
 }
 function calcNearest(player) {
-  nearest = null; let best = 76;
+  nearest = null;
+  if (player.inside) { ui.prompt.textContent = "E  ·  Step back outside"; return; }
+  let best = 76;
   for (const item of jobs) {
     const d = dist(player,item);
     if (d < best) {best=d;nearest={type:"job",item};}
@@ -125,6 +132,7 @@ function roundRect(x,y,w,h,r,fill,stroke=null){
 }
 function drawWorld() {
   const p=me(); if(!p)return;
+  if (p.inside) { drawInterior(p); calcNearest(p); return; }
   const scale=Math.min(canvas.width/850,canvas.height/550);
   const camX=Math.max(0,Math.min(WORLD.w-canvas.width/scale,p.x-canvas.width/scale/2));
   const camY=Math.max(0,Math.min(WORLD.h-canvas.height/scale,p.y-canvas.height/scale/2));
@@ -177,6 +185,41 @@ function drawWorld() {
   });
   ctx.setTransform(1,0,0,1,0,0);ctx.textAlign="start";
   calcNearest(p);
+}
+function drawInterior(player) {
+  const scale=Math.min(canvas.width/650,canvas.height/440);
+  const camX=player.x-canvas.width/scale/2, camY=player.y-canvas.height/scale/2;
+  ctx.setTransform(scale,0,0,scale,-camX*scale,-camY*scale);
+  ctx.fillStyle="#877b66";ctx.fillRect(camX,camY,WORLD.w,WORLD.h);
+  roundRect(600,390,400,320,18,"#e9dfc9","#fff6e2");
+  // warm floorboards
+  ctx.save();ctx.beginPath();ctx.roundRect(600,390,400,320,18);ctx.clip();
+  for(let y=410;y<710;y+=34){ctx.strokeStyle="#d7c8ac";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(600,y);ctx.lineTo(1000,y);ctx.stroke();}
+  ctx.restore();
+  // cozy rug and coffee table
+  roundRect(700,500,200,120,24,"#a9bca0");
+  roundRect(755,530,92,55,12,"#bd8c67","#f8edda");
+  ctx.fillStyle="#6b4835";ctx.beginPath();ctx.arc(800,557,15,0,Math.PI*2);ctx.fill();
+  // sofa
+  roundRect(635,420,145,52,12,"#668775");
+  roundRect(645,425,42,40,9,"#7f9b85");roundRect(694,425,42,40,9,"#7f9b85");roundRect(743,425,29,40,9,"#7f9b85");
+  // bookshelf and plant
+  roundRect(850,410,115,28,5,"#9a6c4b");
+  for(let i=0;i<5;i++){ctx.fillStyle=["#d8a969","#87a7a0","#b87865","#d4c28c","#789071"][i];ctx.fillRect(858+i*20,414,12,20);}
+  ctx.fillStyle="#567f61";ctx.beginPath();ctx.arc(925,650,18,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#99754c";ctx.fillRect(915,662,20,20);
+  // door and little title
+  ctx.fillStyle="#694d38";ctx.fillRect(775,686,50,24);
+  ctx.fillStyle="#394a3d";ctx.textAlign="center";ctx.font="bold 13px monospace";ctx.fillText("A PLACE THAT'S OURS",800,380);
+  ctx.fillStyle="#fff";ctx.font="11px sans-serif";ctx.fillText("E to head back to the street",800,738);
+  // only draw a partner who is in this same home
+  players.filter(other=>other.id!==player.id && other.inside===player.inside).forEach(other=>{
+    ctx.fillStyle="#bd735b";ctx.beginPath();ctx.arc(other.x,other.y,12,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#26372c";ctx.font="11px sans-serif";ctx.fillText(other.name,other.x,other.y-19);
+  });
+  ctx.fillStyle="#527e61";ctx.beginPath();ctx.arc(player.x,player.y,12,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#fff";ctx.font="bold 11px sans-serif";ctx.fillText(player.name.slice(0,1).toUpperCase(),player.x,player.y+4);
+  ctx.setTransform(1,0,0,1,0,0);ctx.textAlign="start";
 }
 function frame(now){
   const dt=Math.min((now-lastFrame)/1000||0,0.05);lastFrame=now;
