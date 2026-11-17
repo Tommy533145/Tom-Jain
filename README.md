@@ -3,11 +3,11 @@
 A separate Godot 4 open-world multiplayer starter. Tom&Grace is not modified.
 
 ## First milestone
-- Procedural low-poly city block and central plaza
+- Procedural city block and central plaza
 - Third-person player controller (WASD, mouse, Space)
-- WebSocket multiplayer transport for desktop and Godot Web exports
+- WebSocket multiplayer transport for Windows and Godot Web exports
 - Server-mediated player join/leave and position relay
-- Simple join screen
+- Player display names and a simple join screen
 
 ## Requirements
 Godot 4.3+.
@@ -19,7 +19,10 @@ Godot 4.3+.
 4. Connect each client to `ws://127.0.0.1:9080`.
 5. For LAN testing, use the host computer's LAN IP instead.
 
-The headless server listens on port 9080. For public internet access, deploy it on a persistent server and configure WSS/TLS at a reverse proxy. Browser exports require secure-context-compatible WSS when hosted over HTTPS.
+The server reads the `PORT` environment variable when present and otherwise listens on port 9080.
+
+## Public server deployment (Render)
+This repository includes a Docker-based Render Blueprint. Create the service from the repository's `render.yaml`; the server binds to Render's assigned `PORT`. Render terminates public TLS, so browser and desktop clients should connect using the service's `wss://` URL. The default Render free instance may spin down after inactivity and is not suitable for guaranteed always-on public multiplayer.
 
 ## Controls
 - WASD: move
@@ -28,4 +31,4 @@ The headless server listens on port 9080. For public internet access, deploy it 
 - Esc: release mouse; click to capture again
 
 ## Prototype limitations
-This is an early networking foundation, not a production public-world service. It has no accounts, anti-cheat, persistence, matchmaking, moderation, rate limiting, voice chat, or authoritative physics yet. Do not expose it to the public until those are implemented. The city uses procedural placeholder geometry; realistic art assets are a later milestone.
+This is an early networking foundation, not a production public-world service. It still needs accounts, authoritative movement/physics, persistence, matchmaking, moderation, rate limiting, monitoring, and load testing before being opened to a large public audience. The city currently uses procedural placeholder geometry; realistic art assets and richer gameplay systems are later milestones.
