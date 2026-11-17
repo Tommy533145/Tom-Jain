@@ -1,9 +1,11 @@
-FROM barichello/godot-ci:4.3
+FROM python:3.12-slim
 
 WORKDIR /app
-COPY . /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY game ./game
 
-ENV GODOT_SILENCE_ROOT_WARNING=1
+ENV PYTHONUNBUFFERED=1
 EXPOSE 10000
 
-CMD ["godot", "--headless", "--path", "godot", "--", "--server"]
+CMD ["sh", "-c", "uvicorn game.server:app --host 0.0.0.0 --port ${PORT:-10000}"]

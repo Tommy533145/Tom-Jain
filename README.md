@@ -1,34 +1,47 @@
-# Tom&Jain
+# Two Keys, One City
 
-A separate Godot 4 open-world multiplayer starter. Tom&Grace is not modified.
+A small third-person 3D city for two partners. Explore together, take local jobs, earn coins, buy homes, go inside, and decorate a shared place. Godot renders the game; Python runs the room server and saves couple progress.
 
-## First milestone
-- Procedural city block and central plaza
-- Third-person player controller (WASD, mouse, Space)
-- WebSocket multiplayer transport for Windows and Godot Web exports
-- Server-mediated player join/leave and position relay
-- Player display names and a simple join screen
+## Run the game locally
 
-## Requirements
-Godot 4.3+.
+Requirements: Godot 4.3+ and Python 3.10+.
 
-## Local multiplayer test
-1. Open `godot/project.godot` in Godot 4.
-2. Start a headless host: `godot --headless --path godot -- --server`
-3. Run two client instances from the editor or exported builds.
-4. Connect each client to `ws://127.0.0.1:9080`.
-5. For LAN testing, use the host computer's LAN IP instead.
+Start the Python server from the repository root:
 
-The server reads the `PORT` environment variable when present and otherwise listens on port 9080.
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn game.server:app --host 0.0.0.0 --port 8000
+```
 
-## Public server deployment (Render)
-This repository includes a Docker-based Render Blueprint. Create the service from the repository's `render.yaml`; the server binds to Render's assigned `PORT`. Render terminates public TLS, so browser and desktop clients should connect using the service's `wss://` URL. The default Render free instance may spin down after inactivity and is not suitable for guaranteed always-on public multiplayer.
+In another terminal, launch the Godot project:
 
-## Controls
-- WASD: move
-- Mouse: look
-- Space: jump
-- Esc: release mouse; click to capture again
+```powershell
+godot --path godot
+```
 
-## Prototype limitations
-This is an early networking foundation, not a production public-world service. It still needs accounts, authoritative movement/physics, persistence, matchmaking, moderation, rate limiting, monitoring, and load testing before being opened to a large public audience. The city currently uses procedural placeholder geometry; realistic art assets and richer gameplay systems are later milestones.
+In the game, keep the server URL as `ws://127.0.0.1:8000/ws`. One partner selects **Create our city** and shares the eight-character code; the other enters that code and selects **Join with code**.
+
+## Play
+
+- WASD: walk
+- Mouse: look around
+- E: take a nearby job, buy or enter a home, add décor, or leave the interior
+- Esc: release the mouse; click to capture it again
+
+Jobs pay coins, and completing the same kind of job together grants a couple bonus. Homes and décor are shared by the room. The Python server checks purchases, job rewards, movement rate, and city collisions.
+
+## Play online
+
+Run the Python service on a public WebSocket host and set the Godot URL to `wss://your-host/ws`. Render's Docker Blueprint is included as a starting point. For saves to survive redeploys, mount persistent storage and set `TWO_KEYS_DATA_DIR` to its path.
+
+A temporary public demo may use a Cloudflare Quick Tunnel, but the URL only works while the host computer and tunnel process remain online.
+
+## Saves
+
+SQLite stores room codes, player coin balances, home ownership, and décor in `game/data/two_keys.sqlite3` by default. Set `TWO_KEYS_DATA_DIR` to move the database to a persistent volume.
+
+## Current scope
+
+This is a playable 3D vertical slice with a procedural city, third-person movement, two-player rooms, jobs, a coin wallet, enterable homes, and shared décor. It is an original small prototype, not a recreation of GTA 6; it still needs richer character and city art, more activities, platform accounts, moderation, and production load testing.
