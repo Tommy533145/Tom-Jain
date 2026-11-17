@@ -33,7 +33,7 @@ The free instance may sleep when idle, and in-memory rooms reset on restart. Use
 
 ## Current scope
 
-This is a playable first slice with a top-down city, private two-player rooms, realtime movement, work spots, a coin wallet, and four buyable homes. It does not yet include user accounts, durable saving, interior scenes/furnishing, matchmaking, moderation, chat, mobile touch controls, or production load testing. The browser client is custom canvas art inspired by open-world city games; it does not use GTA assets.
+This is a playable first slice with a top-down city, private two-player rooms, realtime movement, work spots, a coin wallet, and four buyable homes. It does not yet include user accounts, durable saving, home furnishing, matchmaking, moderation, chat, mobile touch controls, or production load testing. The browser client is custom canvas art inspired by open-world city games; it does not use GTA assets.
 
 ## Original Godot prototype
 
