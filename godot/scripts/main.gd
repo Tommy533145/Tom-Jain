@@ -344,6 +344,10 @@ func _set_city_collision_enabled(enabled: bool) -> void:
         if child is CollisionObject3D:
             child.collision_layer = 1 if enabled else 0
             child.collision_mask = 1 if enabled else 0
+    for child in interior_root.get_children():
+        if child is CollisionObject3D:
+            child.collision_layer = 0 if enabled else 1
+            child.collision_mask = 0 if enabled else 1
 
 func _spawn_player(id: String, player_name: String, player_state: Dictionary) -> void:
     var player := PLAYER_SCENE.instantiate() as CharacterBody3D
