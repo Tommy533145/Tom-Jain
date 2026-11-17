@@ -1,34 +1,40 @@
-# Tom&Jain
+# Two Keys, One City
 
-A separate Godot 4 open-world multiplayer starter. Tom&Grace is not modified.
+A tiny browser city for two people to explore together. Create a private room, share its six-character code, pick up work around town, earn coins, and buy homes for your couple.
 
-## First milestone
-- Procedural city block and central plaza
-- Third-person player controller (WASD, mouse, Space)
-- WebSocket multiplayer transport for Windows and Godot Web exports
-- Server-mediated player join/leave and position relay
-- Player display names and a simple join screen
+The Python browser game lives in `game/`. The original Godot prototype remains in `godot/`.
 
-## Requirements
-Godot 4.3+.
+## Play locally
 
-## Local multiplayer test
-1. Open `godot/project.godot` in Godot 4.
-2. Start a headless host: `godot --headless --path godot -- --server`
-3. Run two client instances from the editor or exported builds.
-4. Connect each client to `ws://127.0.0.1:9080`.
-5. For LAN testing, use the host computer's LAN IP instead.
+Requires Python 3.10 or newer.
 
-The server reads the `PORT` environment variable when present and otherwise listens on port 9080.
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn game.server:app --reload
+```
 
-## Public server deployment (Render)
-This repository includes a Docker-based Render Blueprint. Create the service from the repository's `render.yaml`; the server binds to Render's assigned `PORT`. Render terminates public TLS, so browser and desktop clients should connect using the service's `wss://` URL. The default Render free instance may spin down after inactivity and is not suitable for guaranteed always-on public multiplayer.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in two browser windows. One person creates a city and shares the room code; the other joins with that code. For a second person on another computer, expose the local service securely or deploy it to Render.
 
-## Controls
-- WASD: move
-- Mouse: look
-- Space: jump
-- Esc: release mouse; click to capture again
+## How to play
 
-## Prototype limitations
-This is an early networking foundation, not a production public-world service. It still needs accounts, authoritative movement/physics, persistence, matchmaking, moderation, rate limiting, monitoring, and load testing before being opened to a large public audience. The city currently uses procedural placeholder geometry; realistic art assets and richer gameplay systems are later milestones.
+- Move with WASD; use E near a green work marker or gold home sign.
+- Work shifts pay 15 or 20 coins and have an eight-second cooldown.
+- Homes cost 80–220 coins and are shared by the couple.
+- Each room supports two players. Movement, work rewards, and property purchases are checked by the Python server.
+- Rooms and progress live in server memory in this prototype. They reset when the room empties or the service restarts; persistent accounts and saved homes are a next milestone.
+
+## Deploy on Render
+
+The repository includes a Docker-based Blueprint. Create a Render service from `render.yaml`; it listens on Render's `PORT` and exposes a `/health` endpoint. Use the service's HTTPS URL in a browser; the client automatically uses secure WebSockets.
+
+The free instance may sleep when idle, and in-memory rooms reset on restart. Use a persistent database and an always-on service plan before treating this as a permanent shared world.
+
+## Current scope
+
+This is a playable first slice with a top-down city, private two-player rooms, realtime movement, work spots, a coin wallet, and four buyable homes. It does not yet include user accounts, durable saving, interior scenes/furnishing, matchmaking, moderation, chat, mobile touch controls, or production load testing. The browser client is custom canvas art inspired by open-world city games; it does not use GTA assets.
+
+## Original Godot prototype
+
+The earlier Godot project is in `godot/` and can be opened with Godot 4.3+. It remains available as a separate prototype.
