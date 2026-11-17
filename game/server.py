@@ -14,11 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 
 ROOT = Path(__file__).resolve().parent
-STATIC = ROOT / "static"
 DATA_DIR = Path(os.environ.get("TWO_KEYS_DATA_DIR", str(ROOT / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "two_keys.sqlite3"
@@ -95,12 +93,19 @@ class Room:
 rooms: dict[str, Room] = {}
 rooms_lock = asyncio.Lock()
 app = FastAPI(title="Two Keys, One City")
-app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 @app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+async def index() -> HTMLResponse:
+    return HTMLResponse(
+        """<!doctype html><html><head><meta charset="utf-8"><title>Two Keys, One City</title>
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <style>body{font:16px system-ui;background:#17231e;color:#f4f1e8;max-width:680px;margin:10vh auto;padding:24px}
+        h1{color:#cfe2a7}code{color:#e9bf68}a{color:#cfe2a7}</style></head>
+        <body><h1>Two Keys, One City</h1><p>The 3D game is a Godot client; this Python service hosts the shared city.</p>
+        <p>Run the Godot desktop build, set the server URL to <code>wss://THIS-HOST/ws</code>, then create a city and share its room code.</p>
+        <p><a href="/health">Server health</a></p></body></html>"""
+    )
 
 
 @app.get("/health")
