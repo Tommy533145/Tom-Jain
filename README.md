@@ -21,7 +21,7 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in two browser windows. One 
 
 - Move with WASD; use E near a green work marker or gold home sign.
 - Work shifts pay 15 or 20 coins and have an eight-second cooldown.
-- Homes cost 80–220 coins and are shared by the couple.
+- Homes cost 80–220 coins and are shared by the couple. Enter a purchased home to add décor with coins.
 - Each room supports two players. Movement, work rewards, and property purchases are checked by the Python server.
 - Room codes, home ownership, and each player's coins are saved in a local SQLite database and survive disconnects and process restarts. A public host must mount persistent storage at `TWO_KEYS_DATA_DIR` to keep saves across redeploys.
 
@@ -29,11 +29,11 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in two browser windows. One 
 
 The repository includes a Docker-based Blueprint. Create a Render service from `render.yaml`; it listens on Render's `PORT` and exposes a `/health` endpoint. Use the service's HTTPS URL in a browser; the client automatically uses secure WebSockets.
 
-The free instance may sleep when idle, and in-memory rooms reset on restart. Use a persistent database and an always-on service plan before treating this as a permanent shared world.
+The free instance may sleep when idle. SQLite saves survive process restarts on a persistent disk; configure `TWO_KEYS_DATA_DIR` to the mounted disk path before redeploying.
 
 ## Current scope
 
-This is a playable first slice with a top-down city, private two-player rooms with persistent progress, realtime movement, work spots, a coin wallet, and four buyable homes. It does not yet include user accounts, durable saving, home furnishing, matchmaking, moderation, chat, mobile touch controls, or production load testing. The browser client is custom canvas art inspired by open-world city games; it does not use GTA assets.
+This is a playable first slice with a top-down city, private two-player rooms with persistent progress, realtime movement, jobs with a pair bonus, a coin wallet, four buyable enterable homes, and collectible décor. It does not yet include platform accounts, matchmaking, moderation, chat, or production load testing. The browser client is custom canvas art inspired by open-world city games; it does not use GTA assets.
 
 ## Original Godot prototype
 
