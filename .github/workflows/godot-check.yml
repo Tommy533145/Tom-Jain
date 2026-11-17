@@ -1,4 +1,4 @@
-name: Godot project check
+name: Godot validation and exports
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  validate:
+  validate-and-export:
     runs-on: ubuntu-latest
     container:
       image: barichello/godot-ci:4.4.1
@@ -24,3 +24,20 @@ jobs:
 
       - name: Run project headlessly
         run: timeout 20s godot --headless --path godot --quit-after 5
+
+      - name: Prepare export directories
+        run: mkdir -p dist/windows dist/web
+
+      - name: Export Windows desktop build
+        run: godot --headless --path godot --export-release "Windows Desktop" ../dist/windows/TomAndJain.exe
+
+      - name: Export browser build
+        run: godot --headless --path godot --export-release "Web" ../dist/web/index.html
+
+      - name: Upload Windows and Web builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tom-Jain-Windows-and-Web
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
