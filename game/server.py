@@ -23,16 +23,16 @@ MOVE_INTERVAL = 1 / 24
 ROOM_ALPHABET = string.ascii_uppercase + string.digits
 
 JOBS = [
-    {"id": "cafe", "name": "Cafe shift", "x": 250, "y": 260, "reward": 15},
-    {"id": "courier", "name": "Courier desk", "x": 1320, "y": 270, "reward": 20},
-    {"id": "garden", "name": "Community garden", "x": 280, "y": 850, "reward": 15},
-    {"id": "music", "name": "Street music", "x": 1300, "y": 850, "reward": 20},
+    {"id": "cafe", "name": "Cafe shift", "x": 250, "y": 305, "reward": 15},
+    {"id": "courier", "name": "Courier desk", "x": 1320, "y": 305, "reward": 20},
+    {"id": "garden", "name": "Community garden", "x": 280, "y": 670, "reward": 15},
+    {"id": "music", "name": "Street music", "x": 1300, "y": 670, "reward": 20},
 ]
 HOMES = [
-    {"id": "loft", "name": "Canal Loft", "x": 535, "y": 245, "cost": 80},
-    {"id": "cottage", "name": "Garden Cottage", "x": 1050, "y": 250, "cost": 120},
-    {"id": "townhouse", "name": "Brick Townhouse", "x": 535, "y": 850, "cost": 160},
-    {"id": "penthouse", "name": "Skyline Flat", "x": 1050, "y": 850, "cost": 220},
+    {"id": "loft", "name": "Canal Loft", "x": 715, "y": 245, "cost": 80},
+    {"id": "cottage", "name": "Garden Cottage", "x": 1110, "y": 245, "cost": 120},
+    {"id": "townhouse", "name": "Brick Townhouse", "x": 715, "y": 850, "cost": 160},
+    {"id": "penthouse", "name": "Skyline Flat", "x": 1110, "y": 850, "cost": 220},
 ]
 
 
