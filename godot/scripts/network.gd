@@ -20,7 +20,7 @@ func _ready() -> void:
 
 func start_server() -> void:
     var peer := WebSocketMultiplayerPeer.new()
-    var error := peer.create_server(PORT, "*", MAX_CLIENTS)
+    var error := peer.create_server(PORT, "*")
     if error != OK:
         status_changed.emit("Server error: " + error_string(error))
         return
