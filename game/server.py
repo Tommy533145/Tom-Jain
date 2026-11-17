@@ -70,6 +70,7 @@ class Room:
     players: dict[str, Player] = field(default_factory=dict)
     homes: dict[str, str] = field(default_factory=dict)
     saved_players: dict[str, dict[str, Any]] = field(default_factory=dict)
+    recent_work: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 rooms: dict[str, Room] = {}
@@ -281,8 +282,23 @@ async def serve_room(socket: WebSocket) -> None:
                     continue
                 player.last_work[job["id"]] = now
                 player.coins += job["reward"]
+                notice = f"{player.name} finished {job['name']} and earned {job['reward']} coins."
+                previous = room.recent_work.get(job["id"])
+                if previous and previous["account"] != player.account_key and now - previous["at"] <= 180:
+                    partner = next((p for p in room.players.values() if p.account_key == previous["account"]), None)
+                    if partner:
+                        partner.coins += 12
+                    else:
+                        record = room.saved_players.get(previous["account"])
+                        if record:
+                            record["coins"] += 12
+                    player.coins += 12
+                    notice += " You completed it together: both earned a 12 coin couple bonus!"
+                    room.recent_work.pop(job["id"], None)
+                else:
+                    room.recent_work[job["id"]] = {"account": player.account_key, "at": now}
                 save_room(room)
-                await broadcast(room, {"text": f"{player.name} finished {job['name']} and earned {job['reward']} coins."})
+                await broadcast(room, {"text": notice})
             elif kind == "buy":
                 if player.inside:
                     await send_error(socket, "Head outside to browse homes.")
