@@ -1,0 +1,26 @@
+name: Godot project check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Godot version
+        run: godot --version
+
+      - name: Import project and validate scripts
+        run: godot --headless --editor --path godot --quit
+
+      - name: Run project headlessly
+        run: timeout 20s godot --headless --path godot --quit-after 5
