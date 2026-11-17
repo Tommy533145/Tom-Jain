@@ -271,6 +271,7 @@ document.querySelectorAll(".touch-controls [data-key]").forEach(button=>{
   button.addEventListener("lostpointercapture",()=>keys.delete(key));
 });
 document.addEventListener("keydown",e=>{
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
   const key=e.key.toLowerCase();
   if(["w","a","s","d","e","arrowup","arrowdown","arrowleft","arrowright"].includes(key))e.preventDefault();
   if(["w","a","s","d"].includes(key))keys.add(key);
