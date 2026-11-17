@@ -13,6 +13,7 @@ var account_key := ""
 var pending_action := ""
 var pending_room := ""
 var connected_once := false
+var connect_attempt := false
 var last_move_sent := 0.0
 const MOVE_SEND_INTERVAL := 1.0 / 15.0
 
@@ -46,6 +47,9 @@ func _process(_delta: float) -> void:
     elif ready == WebSocketPeer.STATE_CLOSED and connected_once:
         connected_once = false
         status_changed.emit("Disconnected from the city.")
+    elif ready == WebSocketPeer.STATE_CLOSED and connect_attempt:
+        connect_attempt = false
+        status_changed.emit("Connection failed. Check the server URL.")
 
 func connect_to_city(url: String, action: String, room: String, display_name: String) -> void:
     if socket.get_ready_state() != WebSocketPeer.STATE_CLOSED:
@@ -59,8 +63,10 @@ func connect_to_city(url: String, action: String, room: String, display_name: St
     room_code = ""
     player_id = ""
     connected_once = false
+    connect_attempt = true
     var error := socket.connect_to_url(url.strip_edges())
     if error != OK:
+        connect_attempt = false
         status_changed.emit("Could not connect: " + error_string(error))
         return
     status_changed.emit("Connecting to your city…")
@@ -99,6 +105,7 @@ func _handle_message(message: Dictionary) -> void:
         "welcome":
             room_code = str(message.get("room", ""))
             player_id = str(message.get("player", ""))
+            connect_attempt = false
             room_joined.emit(room_code, player_id)
             status_changed.emit("Connected to city " + room_code)
         "state":
