@@ -211,7 +211,26 @@ function drawWorld() {
     ctx.fillStyle="#23362a";ctx.font="11px sans-serif";ctx.fillText(pl.name,pl.x,pl.y-20);
   });
   ctx.setTransform(1,0,0,1,0,0);ctx.textAlign="start";
+  drawMiniMap();
   calcNearest(p);
+}
+function drawMiniMap(){
+  const x=canvas.width-174,y=16,w=158,h=112,sx=w/WORLD.w,sy=h/WORLD.h;
+  roundRect(x,y,w,h,8,"#17231edb","#ffffff66");
+  ctx.save();ctx.beginPath();ctx.roundRect(x+5,y+5,w-10,h-10,5);ctx.clip();
+  ctx.fillStyle="#9cae9c";ctx.fillRect(x+5,y+5,w-10,h-10);
+  ctx.fillStyle="#616a65";
+  ctx.fillRect(x+5,y+5+(270*sy),w-10,62*sy);
+  ctx.fillRect(x+5,y+5+(634*sy),w-10,62*sy);
+  buildings.forEach(b=>{
+    ctx.fillStyle="#526254";
+    ctx.fillRect(x+5+b.x*sx,y+5+b.y*sy,Math.max(3,b.w*sx),Math.max(3,b.h*sy));
+  });
+  jobs.forEach(job=>{ctx.fillStyle="#d5e59d";ctx.beginPath();ctx.arc(x+5+job.x*sx,y+5+job.y*sy,2.7,0,Math.PI*2);ctx.fill();});
+  properties.forEach(home=>{ctx.fillStyle=homes[home.id]?"#f7f1dc":"#e9bf68";ctx.fillRect(x+5+home.x*sx-2,y+5+home.y*sy-2,4,4);});
+  players.filter(pl=>!pl.inside).forEach(pl=>{ctx.fillStyle=pl.id===myId?"#8de3a0":"#ff9c80";ctx.beginPath();ctx.arc(x+5+pl.x*sx,y+5+pl.y*sy,3.5,0,Math.PI*2);ctx.fill();});
+  ctx.restore();
+  ctx.fillStyle="#fff";ctx.font="9px monospace";ctx.fillText("CITY MAP",x+9,y+12);
 }
 function drawInterior(player) {
   const scale=Math.min(canvas.width/650,canvas.height/440);
