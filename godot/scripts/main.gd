@@ -335,8 +335,15 @@ func _on_state_received(state: Dictionary) -> void:
             if id == local_id:
                 local_player = null
     city_root.visible = local_inside.is_empty()
+    _set_city_collision_enabled(local_inside.is_empty())
     interior_root.visible = not local_inside.is_empty()
     _refresh_interior_decor()
+
+func _set_city_collision_enabled(enabled: bool) -> void:
+    for child in city_root.get_children():
+        if child is CollisionObject3D:
+            child.collision_layer = 1 if enabled else 0
+            child.collision_mask = 1 if enabled else 0
 
 func _spawn_player(id: String, player_name: String, player_state: Dictionary) -> void:
     var player := PLAYER_SCENE.instantiate() as CharacterBody3D
