@@ -11,7 +11,7 @@ const ui = {
 };
 const WORLD = {w:1600,h:1100};
 const keys = new Set();
-let ws = null, roomCode = "", myId = "", players = [], homes = {}, jobs = [], properties = [];
+let ws = null, roomCode = "", myId = "", players = [], homes = {}, decor = {}, furniture = [], jobs = [], properties = [];
 let accountKey = localStorage.getItem("twoKeysAccountKey");
 if (!accountKey) {
   accountKey = crypto.randomUUID();
@@ -53,7 +53,7 @@ function connect(kind, code="") {
       ui.dot.classList.add("online"); ui.title.textContent = "ROOM " + roomCode;
     }
     if (data.type === "state") {
-      players = data.players || []; homes = data.homes || {};
+      players = data.players || []; homes = data.homes || {}; decor = data.decor || {}; furniture = data.furniture || [];
       jobs = data.jobs || []; properties = data.properties || [];
       updateHud();
       if (data.notice) showToast(data.notice.text);
@@ -91,7 +91,15 @@ function dist(a,b) { return Math.hypot(a.x-b.x,a.y-b.y); }
 function interact() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const player = me();
-  if (player?.inside) { ws.send(JSON.stringify({type:"exit"})); return; }
+  if (player?.inside) {
+    if (dist(player,{x:940,y:650}) < 90) {
+      const owned = decor[player.inside] || [];
+      const nextItem = furniture.find(item => !owned.includes(item.id));
+      if (nextItem) ws.send(JSON.stringify({type:"decorate",item:nextItem.id}));
+      else showToast("You collected every décor item for this home!");
+    } else ws.send(JSON.stringify({type:"exit"}));
+    return;
+  }
   if (!nearest) return;
   if (nearest.type === "job") ws.send(JSON.stringify({type:"work",job:nearest.item.id}));
   else if (homes[nearest.item.id]) ws.send(JSON.stringify({type:"enter",home:nearest.item.id}));
@@ -99,7 +107,16 @@ function interact() {
 }
 function calcNearest(player) {
   nearest = null;
-  if (player.inside) { ui.prompt.textContent = "E  ·  Step back outside"; return; }
+  if (player.inside) {
+    const home = properties.find(item => item.id === player.inside);
+    const owned = decor[player.inside] || [];
+    const nextItem = furniture.find(item => !owned.includes(item.id));
+    ui.title.textContent = home ? home.name.toUpperCase() : "OUR HOME";
+    if (dist(player,{x:940,y:650}) < 90) {
+      ui.prompt.textContent = nextItem ? `E  ·  Add ${nextItem.name}  ·  ${nextItem.cost} coins` : "E  ·  All décor collected";
+    } else ui.prompt.textContent = "E  ·  Step back outside  ·  " + owned.length + " décor items";
+    return;
+  }
   let best = 76;
   for (const item of jobs) {
     const d = dist(player,item);
@@ -139,6 +156,7 @@ function roundRect(x,y,w,h,r,fill,stroke=null){
 function drawWorld() {
   const p=me(); if(!p)return;
   if (p.inside) { drawInterior(p); calcNearest(p); return; }
+  ui.title.textContent = "ROOM " + roomCode.toUpperCase();
   const scale=Math.min(canvas.width/850,canvas.height/550);
   const camX=Math.max(0,Math.min(WORLD.w-canvas.width/scale,p.x-canvas.width/scale/2));
   const camY=Math.max(0,Math.min(WORLD.h-canvas.height/scale,p.y-canvas.height/scale/2));
@@ -203,18 +221,20 @@ function drawInterior(player) {
   ctx.save();ctx.beginPath();ctx.roundRect(600,390,400,320,18);ctx.clip();
   for(let y=410;y<710;y+=34){ctx.strokeStyle="#d7c8ac";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(600,y);ctx.lineTo(1000,y);ctx.stroke();}
   ctx.restore();
-  // cozy rug and coffee table
-  roundRect(700,500,200,120,24,"#a9bca0");
-  roundRect(755,530,92,55,12,"#bd8c67","#f8edda");
-  ctx.fillStyle="#6b4835";ctx.beginPath();ctx.arc(800,557,15,0,Math.PI*2);ctx.fill();
-  // sofa
-  roundRect(635,420,145,52,12,"#668775");
-  roundRect(645,425,42,40,9,"#7f9b85");roundRect(694,425,42,40,9,"#7f9b85");roundRect(743,425,29,40,9,"#7f9b85");
-  // bookshelf and plant
-  roundRect(850,410,115,28,5,"#9a6c4b");
-  for(let i=0;i<5;i++){ctx.fillStyle=["#d8a969","#87a7a0","#b87865","#d4c28c","#789071"][i];ctx.fillRect(858+i*20,414,12,20);}
-  ctx.fillStyle="#567f61";ctx.beginPath();ctx.arc(925,650,18,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle="#99754c";ctx.fillRect(915,662,20,20);
+  const owned = decor[player.inside] || [];
+  if(owned.includes("sofa")){
+    roundRect(635,420,145,52,12,"#668775");
+    roundRect(645,425,42,40,9,"#7f9b85");roundRect(694,425,42,40,9,"#7f9b85");roundRect(743,425,29,40,9,"#7f9b85");
+  }
+  if(owned.includes("table")){roundRect(755,530,92,55,12,"#bd8c67","#f8edda");ctx.fillStyle="#6b4835";ctx.beginPath();ctx.arc(800,557,15,0,Math.PI*2);ctx.fill();}
+  if(owned.includes("plant")){ctx.fillStyle="#567f61";ctx.beginPath();ctx.arc(655,650,18,0,Math.PI*2);ctx.fill();ctx.fillStyle="#99754c";ctx.fillRect(645,662,20,20);}
+  if(owned.includes("lamp")){ctx.strokeStyle="#795b3c";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(875,475);ctx.lineTo(875,525);ctx.stroke();ctx.fillStyle="#e8c878";ctx.beginPath();ctx.arc(875,468,13,0,Math.PI*2);ctx.fill();}
+  if(owned.includes("art")){roundRect(835,450,90,54,3,"#7b5843");ctx.fillStyle="#abc2a1";ctx.fillRect(841,456,78,42);ctx.fillStyle="#e2b978";ctx.beginPath();ctx.arc(880,476,12,0,Math.PI*2);ctx.fill();}
+  if(owned.includes("bed")){roundRect(835,555,125,72,8,"#9b755c");roundRect(845,562,48,27,7,"#f3ead7");roundRect(900,562,48,27,7,"#f3ead7");ctx.fillStyle="#c88579";ctx.fillRect(843,589,108,28);}
+  // décor stand
+  roundRect(910,620,60,55,7,"#806248","#f1dfbb");
+  ctx.fillStyle="#f7e9cc";ctx.textAlign="center";ctx.font="bold 18px sans-serif";ctx.fillText("✦",940,646);
+  ctx.fillStyle="#43382b";ctx.font="10px sans-serif";ctx.fillText("DÉCOR",940,690);
   // door and little title
   ctx.fillStyle="#694d38";ctx.fillRect(775,686,50,24);
   ctx.fillStyle="#394a3d";ctx.textAlign="center";ctx.font="bold 13px monospace";ctx.fillText("A PLACE THAT'S OURS",800,380);
