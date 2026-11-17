@@ -9,11 +9,12 @@ var camera_pivot: Node3D
 var remote_target_position: Vector3
 var remote_target_yaw: float = 0.0
 var display_name: String = "Player"
+var name_tag: Label3D
 
 func _ready() -> void:
     camera_pivot = $CameraPivot
     $CameraPivot/SpringArm3D/Camera3D.current = is_multiplayer_authority()
-    var name_tag := Label3D.new()
+    name_tag = Label3D.new()
     name_tag.text = display_name
     name_tag.position = Vector3(0, 2.1, 0)
     name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -61,3 +62,8 @@ func set_remote_state(pos: Vector3, yaw: float) -> void:
     if not is_multiplayer_authority():
         remote_target_position = pos
         remote_target_yaw = yaw
+
+func update_display_name(value: String) -> void:
+    display_name = value
+    if is_instance_valid(name_tag):
+        name_tag.text = display_name
