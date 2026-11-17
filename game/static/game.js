@@ -10,6 +10,7 @@ const ui = {
   prompt: document.querySelector("#actionPrompt"), toast: document.querySelector("#toast")
 };
 const WORLD = {w:1600,h:1100};
+ui.code.value = localStorage.getItem("twoKeysLastRoom") || "";
 const keys = new Set();
 let ws = null, roomCode = "", myId = "", players = [], homes = {}, decor = {}, furniture = [], jobs = [], properties = [];
 let accountKey = localStorage.getItem("twoKeysAccountKey");
@@ -48,6 +49,7 @@ function connect(kind, code="") {
     }
     if (data.type === "welcome") {
       roomCode = data.room; myId = data.player;
+      localStorage.setItem("twoKeysLastRoom", roomCode);
       ui.lobby.classList.add("hidden"); ui.game.classList.remove("hidden");
       ui.badge.textContent = roomCode; ui.connection.textContent = "City connected"; ui.code.value = roomCode;
       ui.dot.classList.add("online"); ui.title.textContent = "ROOM " + roomCode;
