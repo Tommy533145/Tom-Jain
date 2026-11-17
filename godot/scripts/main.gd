@@ -47,6 +47,7 @@ var furniture_catalog: Array = FURNITURE
 var local_inside := ""
 var nearby: Dictionary = {}
 var toast_timer := 0.0
+var last_decor_signature := ""
 
 var lobby_layer: CanvasLayer
 var hud_layer: CanvasLayer
@@ -69,9 +70,6 @@ func _ready() -> void:
     Network.state_received.connect(_on_state_received)
     Network.status_changed.connect(_on_status_changed)
     Network.server_error.connect(_on_server_error)
-    if OS.get_cmdline_user_args().has("--server"):
-        lobby_layer.visible = false
-        status_label.text = "Server is running. Connect with a Godot client."
 
 func _process(delta: float) -> void:
     toast_timer = maxf(toast_timer - delta, 0.0)
@@ -288,8 +286,9 @@ func _connect_to_city(action: String) -> void:
     lobby_status.text = "Connecting…"
     Network.connect_to_city(url_input.text, action, room_input.text, name_input.text)
 
-func _on_room_joined(code: String, _player_id: String) -> void:
+func _on_room_joined(code: String, player_id: String) -> void:
     current_room = code
+    local_id = player_id
     room_input.text = code
     room_label.text = "CITY  " + code
     lobby_layer.visible = false
@@ -314,7 +313,7 @@ func _on_state_received(state: Dictionary) -> void:
         var city_position := Vector3(float(player_state.get("x", 800.0)) * UNIT_SCALE, 0.0, float(player_state.get("y", 305.0)) * UNIT_SCALE)
         var yaw := float(player_state.get("yaw", 0.0))
         if id == local_id:
-            local_inside = str(player_state.get("inside", "") or "")
+            local_inside = _nullable_string(player_state.get("inside", ""))
             if local_inside.is_empty():
                 if local_player == null:
                     local_player = node
@@ -351,8 +350,11 @@ func _spawn_player(id: String, player_name: String, player_state: Dictionary) ->
     if id == local_id:
         local_player = player
 
+func _nullable_string(value: Variant) -> String:
+    return "" if value == null else str(value)
+
 func _should_show_player(player_state: Dictionary, id: String) -> bool:
-    var their_inside := str(player_state.get("inside", "") or "")
+    var their_inside := _nullable_string(player_state.get("inside", ""))
     if local_inside.is_empty():
         return their_inside.is_empty()
     return id == local_id or their_inside == local_inside
@@ -360,12 +362,16 @@ func _should_show_player(player_state: Dictionary, id: String) -> bool:
 func _refresh_interior_decor() -> void:
     if interior_root == null:
         return
+    var items: Array = decor_by_home.get(local_inside, [])
+    var signature := local_inside + ":" + JSON.stringify(items)
+    if signature == last_decor_signature:
+        return
+    last_decor_signature = signature
     for child in interior_root.get_children():
         if str(child.name).begins_with("Purchased "):
             child.queue_free()
     if local_inside.is_empty():
         return
-    var items: Array = decor_by_home.get(local_inside, [])
     for item in items:
         match str(item):
             "sofa":
