@@ -2,11 +2,12 @@ extends Node
 
 signal player_spawned(peer_id: int, player_name: String, spawn_position: Vector3)
 signal player_removed(peer_id: int)
+signal player_name_changed(peer_id: int, player_name: String)
+signal player_state_received(peer_id: int, pos: Vector3, yaw: float)
 signal status_changed(message: String)
 
 const PORT: int = 9080
 const MAX_CLIENTS: int = 64
-
 var player_display_name: String = "Player"
 var known_names: Dictionary = {}
 
@@ -19,7 +20,7 @@ func _ready() -> void:
 
 func start_server() -> void:
     var peer := WebSocketMultiplayerPeer.new()
-    var error := peer.create_server(PORT, "*")
+    var error := peer.create_server(PORT, "*", MAX_CLIENTS)
     if error != OK:
         status_changed.emit("Server error: " + error_string(error))
         return
@@ -42,9 +43,7 @@ func _on_peer_connected(peer_id: int) -> void:
         return
     var spawn := Vector3(float((peer_id % 5) * 2), 1, float((peer_id % 7) * 2))
     known_names[peer_id] = "Player %d" % peer_id
-    # Inform all clients about the new player.
     spawn_player.rpc(peer_id, known_names[peer_id], spawn)
-    # Send the joining client the players already in the world.
     for existing_id in known_names.keys():
         if int(existing_id) != peer_id:
             spawn_player.rpc_id(peer_id, int(existing_id), str(known_names[existing_id]), Vector3(0, 1, 0))
@@ -75,12 +74,15 @@ func register_name(value: String) -> void:
     if clean_name.is_empty():
         clean_name = "Player %d" % sender
     known_names[sender] = clean_name
-    var spawn := Vector3(float((sender % 5) * 2), 1, float((sender % 7) * 2))
-    spawn_player.rpc(sender, clean_name, spawn)
+    set_player_name.rpc(sender, clean_name)
 
 @rpc("authority", "call_local", "reliable")
 func spawn_player(peer_id: int, player_name: String, spawn_position: Vector3) -> void:
     player_spawned.emit(peer_id, player_name, spawn_position)
+
+@rpc("authority", "call_local", "reliable")
+func set_player_name(peer_id: int, player_name: String) -> void:
+    player_name_changed.emit(peer_id, player_name)
 
 @rpc("authority", "call_local", "reliable")
 func remove_player(peer_id: int) -> void:
@@ -105,5 +107,3 @@ func submit_state(pos: Vector3, yaw: float) -> void:
 @rpc("authority", "call_local", "unreliable")
 func relay_state(peer_id: int, pos: Vector3, yaw: float) -> void:
     player_state_received.emit(peer_id, pos, yaw)
-
-signal player_state_received(peer_id: int, pos: Vector3, yaw: float)
