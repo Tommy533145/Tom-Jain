@@ -41,12 +41,24 @@ HOMES = [
     {"id": "townhouse", "name": "Brick Townhouse", "x": 715, "y": 850, "cost": 160},
     {"id": "penthouse", "name": "Skyline Flat", "x": 1110, "y": 850, "cost": 220},
 ]
+FURNITURE = [
+    {"id": "sofa", "name": "Cozy sofa", "cost": 45},
+    {"id": "table", "name": "Coffee table", "cost": 30},
+    {"id": "plant", "name": "Leafy plant", "cost": 20},
+    {"id": "lamp", "name": "Reading lamp", "cost": 25},
+    {"id": "art", "name": "Framed city art", "cost": 35},
+    {"id": "bed", "name": "Big shared bed", "cost": 70},
+]
 
 with sqlite3.connect(DB_PATH) as db:
     db.execute("CREATE TABLE IF NOT EXISTS couple_rooms (code TEXT PRIMARY KEY, homes_json TEXT NOT NULL, updated_at REAL NOT NULL)")
     db.execute("""CREATE TABLE IF NOT EXISTS couple_players (
         room_code TEXT NOT NULL, account_key TEXT NOT NULL, name TEXT NOT NULL, coins INTEGER NOT NULL,
         updated_at REAL NOT NULL, PRIMARY KEY (room_code, account_key)
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS couple_decor (
+        room_code TEXT NOT NULL, home_id TEXT NOT NULL, items_json TEXT NOT NULL,
+        PRIMARY KEY (room_code, home_id)
     )""")
 
 
@@ -70,6 +82,7 @@ class Room:
     players: dict[str, Player] = field(default_factory=dict)
     homes: dict[str, str] = field(default_factory=dict)
     saved_players: dict[str, dict[str, Any]] = field(default_factory=dict)
+    decor: dict[str, list[str]] = field(default_factory=dict)
     recent_work: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
@@ -99,6 +112,10 @@ def load_saved_room(code: str) -> Room | None:
             "SELECT account_key, name, coins FROM couple_players WHERE room_code = ?", (code,)
         ):
             room.saved_players[account_key] = {"name": name, "coins": coins}
+        for home_id, items_json in db.execute(
+            "SELECT home_id, items_json FROM couple_decor WHERE room_code = ?", (code,)
+        ):
+            room.decor[home_id] = json.loads(items_json)
         return room
 
 
@@ -115,6 +132,12 @@ def save_room(room: Room) -> None:
                 "INSERT INTO couple_players(room_code, account_key, name, coins, updated_at) VALUES(?, ?, ?, ?, ?) "
                 "ON CONFLICT(room_code, account_key) DO UPDATE SET name=excluded.name, coins=excluded.coins, updated_at=excluded.updated_at",
                 (room.code, key, record["name"], record["coins"], now),
+            )
+        for home_id, items in room.decor.items():
+            db.execute(
+                "INSERT INTO couple_decor(room_code, home_id, items_json) VALUES(?, ?, ?) "
+                "ON CONFLICT(room_code, home_id) DO UPDATE SET items_json=excluded.items_json",
+                (room.code, home_id, json.dumps(items)),
             )
         for player in room.players.values():
             db.execute(
@@ -137,6 +160,8 @@ def room_snapshot(room: Room) -> dict[str, Any]:
             for player in room.players.values()
         ],
         "homes": room.homes,
+        "decor": room.decor,
+        "furniture": FURNITURE,
         "jobs": JOBS,
         "properties": HOMES,
     }
@@ -197,7 +222,7 @@ async def find_or_create_room(request: dict[str, Any], socket: WebSocket) -> tup
         player = Player(
             id=player_id,
             account_key=account_key,
-            name=name if saved is None else saved["name"],
+            name=name,
             socket=socket,
             x=len(room.players) * 54 + 770,
             y=560,
@@ -299,6 +324,25 @@ async def serve_room(socket: WebSocket) -> None:
                     room.recent_work[job["id"]] = {"account": player.account_key, "at": now}
                 save_room(room)
                 await broadcast(room, {"text": notice})
+            elif kind == "decorate":
+                if not player.inside or math.hypot(player.x - 940, player.y - 650) > 82:
+                    await send_error(socket, "Walk over to the décor stand inside your home.")
+                    continue
+                item = next((entry for entry in FURNITURE if entry["id"] == message.get("item")), None)
+                if item is None:
+                    await send_error(socket, "That décor item is not available.")
+                    continue
+                items = room.decor.setdefault(player.inside, [])
+                if item["id"] in items:
+                    await send_error(socket, "Your home already has that item.")
+                    continue
+                if player.coins < item["cost"]:
+                    await send_error(socket, f"You need {item['cost'] - player.coins} more coins.")
+                    continue
+                player.coins -= item["cost"]
+                items.append(item["id"])
+                save_room(room)
+                await broadcast(room, {"text": f"{player.name} added a {item['name']} to your home."})
             elif kind == "buy":
                 if player.inside:
                     await send_error(socket, "Head outside to browse homes.")
@@ -315,6 +359,7 @@ async def serve_room(socket: WebSocket) -> None:
                     continue
                 player.coins -= home["cost"]
                 room.homes[home["id"]] = player.name
+                room.decor.setdefault(home["id"], [])
                 save_room(room)
                 await broadcast(room, {"text": f"{player.name} bought the {home['name']} for your couple!"})
     except (WebSocketDisconnect, asyncio.TimeoutError):
