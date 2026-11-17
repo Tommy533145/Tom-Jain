@@ -14,6 +14,7 @@ func _ready() -> void:
     _create_menu()
     Network.player_spawned.connect(_spawn_player)
     Network.player_removed.connect(_remove_player)
+    Network.player_name_changed.connect(_rename_player)
     Network.player_state_received.connect(_apply_player_state)
     Network.status_changed.connect(_update_status)
     if OS.get_cmdline_user_args().has("--server"):
@@ -166,3 +167,10 @@ func _apply_player_state(peer_id: int, pos: Vector3, yaw: float) -> void:
     var player := players_root.get_node_or_null(str(peer_id))
     if player:
         player.set_remote_state(pos, yaw)
+
+func _rename_player(peer_id: int, player_name: String) -> void:
+    if players_root == null:
+        return
+    var player = players_root.get_node_or_null(str(peer_id))
+    if player:
+        player.update_display_name(player_name)
