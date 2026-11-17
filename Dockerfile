@@ -1,4 +1,4 @@
-FROM barichello/godot-ci:4.3
+FROM barichello/godot-ci:4.4.1
 
 WORKDIR /app
 COPY . /app
