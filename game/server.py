@@ -79,6 +79,7 @@ class Player:
     last_move: float = 0.0
     last_work: dict[str, float] = field(default_factory=dict)
     inside: str | None = None
+    yaw: float = 0.0
 
 
 @dataclass
@@ -168,7 +169,7 @@ def room_snapshot(room: Room) -> dict[str, Any]:
         "type": "state",
         "room": room.code,
         "players": [
-            {"id": player.id, "name": player.name, "x": player.x, "y": player.y, "coins": player.coins, "inside": player.inside}
+            {"id": player.id, "name": player.name, "x": player.x, "y": player.y, "coins": player.coins, "inside": player.inside, "yaw": player.yaw}
             for player in room.players.values()
         ],
         "homes": room.homes,
@@ -272,9 +273,10 @@ async def serve_room(socket: WebSocket) -> None:
                 try:
                     x = float(message.get("x"))
                     y = float(message.get("y"))
+                    yaw = float(message.get("yaw", player.yaw))
                 except (TypeError, ValueError):
                     continue
-                if not math.isfinite(x) or not math.isfinite(y):
+                if not math.isfinite(x) or not math.isfinite(y) or not math.isfinite(yaw):
                     continue
                 if player.inside:
                     x = min(max(x, 600.0), 1000.0)
@@ -289,7 +291,7 @@ async def serve_room(socket: WebSocket) -> None:
                 if player.last_move and math.hypot(x - player.x, y - player.y) > max_distance:
                     player.last_move = now
                     continue
-                player.x, player.y, player.last_move = x, y, now
+                player.x, player.y, player.yaw, player.last_move = x, y, yaw, now
                 await broadcast(room)
             elif kind == "enter":
                 home = next((item for item in HOMES if item["id"] == message.get("home")), None)
