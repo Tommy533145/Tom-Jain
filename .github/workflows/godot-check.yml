@@ -49,3 +49,11 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 14
+
+  build-full-stack-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build Python server and embedded Godot Web client
+        run: docker build --tag two-keys-online .
