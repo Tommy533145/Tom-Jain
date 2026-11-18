@@ -14,9 +14,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
+WEB_DIR = Path(os.environ.get("TWO_KEYS_WEB_DIR", str(ROOT / "static" / "game")))
 DATA_DIR = Path(os.environ.get("TWO_KEYS_DATA_DIR", str(ROOT / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "two_keys.sqlite3"
@@ -96,7 +98,10 @@ app = FastAPI(title="Two Keys, One City")
 
 
 @app.get("/")
-async def index() -> HTMLResponse:
+async def index() -> FileResponse | HTMLResponse:
+    game_index = WEB_DIR / "index.html"
+    if game_index.is_file():
+        return FileResponse(game_index)
     return HTMLResponse(
         """<!doctype html><html><head><meta charset="utf-8"><title>Two Keys, One City</title>
         <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -400,3 +405,7 @@ async def serve_room(socket: WebSocket) -> None:
 @app.websocket("/ws")
 async def websocket_endpoint(socket: WebSocket) -> None:
     await serve_room(socket)
+
+
+if (WEB_DIR / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="godot_web_game")
