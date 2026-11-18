@@ -14,12 +14,14 @@ var room_label: Label
 
 func _ready() -> void:
     _create_world()
+    _create_interaction_markers()
     _create_menu()
     Network.player_spawned.connect(_spawn_player)
     Network.player_removed.connect(_remove_player)
     Network.player_name_changed.connect(_rename_player)
     Network.player_state_received.connect(_apply_player_state)
     Network.status_changed.connect(_update_status)
+    Network.room_state_received.connect(_update_room_state)
 
 func _create_world() -> void:
     var world_env := WorldEnvironment.new()
@@ -82,6 +84,48 @@ func _make_box(label: String, pos: Vector3, size: Vector3, color: Color) -> void
     body.add_child(collision)
     add_child(body)
 
+func _create_interaction_markers() -> void:
+    var jobs := [
+        ["Cafe shift", 250.0, 305.0, Color(0.28, 0.9, 0.5)],
+        ["Courier desk", 1320.0, 305.0, Color(0.28, 0.9, 0.5)],
+        ["Community garden", 280.0, 670.0, Color(0.28, 0.9, 0.5)],
+        ["Street music", 1300.0, 670.0, Color(0.28, 0.9, 0.5)],
+    ]
+    for job in jobs:
+        _make_marker(str(job[0]), _city_to_world(float(job[1]), float(job[2])), job[3])
+    var homes := [
+        ["Canal Loft  |  80 coins", 715.0, 245.0],
+        ["Garden Cottage  |  120 coins", 1110.0, 245.0],
+        ["Brick Townhouse  |  160 coins", 715.0, 850.0],
+        ["Skyline Flat  |  220 coins", 1110.0, 850.0],
+    ]
+    for home in homes:
+        _make_marker(str(home[0]), _city_to_world(float(home[1]), float(home[2])), Color(0.98, 0.72, 0.22))
+
+func _city_to_world(x: float, y: float) -> Vector3:
+    return Vector3(x / 1600.0 * 180.0 - 90.0, 1.4, y / 1100.0 * 180.0 - 90.0)
+
+func _make_marker(label: String, pos: Vector3, color: Color) -> void:
+    var beacon := MeshInstance3D.new()
+    var sphere := SphereMesh.new()
+    sphere.radius = 1.0
+    sphere.height = 2.0
+    beacon.mesh = sphere
+    beacon.position = pos
+    var material := StandardMaterial3D.new()
+    material.albedo_color = color
+    material.emission_enabled = true
+    material.emission = color * 0.65
+    beacon.material_override = material
+    add_child(beacon)
+    var sign := Label3D.new()
+    sign.text = label + "  |  E"
+    sign.position = pos + Vector3(0, 2.0, 0)
+    sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    sign.font_size = 36
+    sign.modulate = color
+    add_child(sign)
+
 func _create_menu() -> void:
     menu_layer = CanvasLayer.new()
     add_child(menu_layer)
@@ -142,7 +186,7 @@ func _create_menu() -> void:
     room_label.add_theme_font_size_override("font_size", 20)
     hud_layer.add_child(room_label)
     var controls := Label.new()
-    controls.text = "WASD move  |  Mouse look  |  Space jump  |  Esc release mouse"
+    controls.text = "WASD move  |  Mouse look  |  Space jump  |  E work/buy/enter  |  Esc release mouse"
     controls.position = Vector2(20, 50)
     hud_layer.add_child(controls)
 
@@ -198,4 +242,12 @@ func _rename_player(peer_id: String, player_name: String) -> void:
     var player = players_root.get_node_or_null(peer_id)
     if player:
         player.update_display_name(player_name)
+
+func _update_room_state(state: Dictionary) -> void:
+    for player in state.get("players", []):
+        if str(player.get("id", "")) == Network.player_id:
+            var coins := int(player.get("coins", 0))
+            var inside := str(player.get("inside", ""))
+            var location := "  |  Inside " + inside if not inside.is_empty() else ""
+            room_label.text = "ROOM " + Network.room_code + "  |  " + str(coins) + " COINS" + location + "  |  SHARE THE CODE"
 

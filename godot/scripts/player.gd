@@ -27,7 +27,10 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
     if not is_local_player:
         return
-    if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+        Network.interact()
+        get_viewport().set_input_as_handled()
+    elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
         rotate_y(-event.relative.x * mouse_sensitivity)
         camera_pivot.rotate_x(-event.relative.y * mouse_sensitivity)
         camera_pivot.rotation.x = clamp(camera_pivot.rotation.x, -1.0, 0.65)

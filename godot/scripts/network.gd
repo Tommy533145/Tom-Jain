@@ -19,6 +19,8 @@ var room_code := ""
 var known_players: Dictionary = {}
 var room_state: Dictionary = {}
 var account_key := ""
+var local_position := Vector3.ZERO
+var local_inside := ""
 
 func _ready() -> void:
 	var config := ConfigFile.new()
@@ -89,6 +91,7 @@ func connect_to_server(url: String, player_name: String, code: String = "") -> v
 func send_player_state(pos: Vector3, yaw: float) -> void:
 	if socket == null or socket.get_ready_state() != WebSocketPeer.STATE_OPEN or player_id.is_empty():
 		return
+	local_position = pos
 	var message := {
 		"type": "move",
 		"x": (pos.x + 90.0) / 180.0 * CITY_WIDTH,
@@ -96,6 +99,41 @@ func send_player_state(pos: Vector3, yaw: float) -> void:
 		"yaw": yaw,
 	}
 	socket.send_text(JSON.stringify(message))
+
+func interact() -> void:
+	if socket == null or socket.get_ready_state() != WebSocketPeer.STATE_OPEN or player_id.is_empty():
+		return
+	if not local_inside.is_empty():
+		_send_message({"type": "exit"})
+		return
+	var nearest_distance := INF
+	var nearest_kind := ""
+	var nearest_id := ""
+	for job in room_state.get("jobs", []):
+		var point := _server_position_to_world(float(job.get("x", 0)), float(job.get("y", 0)))
+		var distance := Vector2(local_position.x, local_position.z).distance_to(Vector2(point.x, point.z))
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest_kind = "work"
+			nearest_id = str(job.get("id", ""))
+	for home in room_state.get("properties", []):
+		var point := _server_position_to_world(float(home.get("x", 0)), float(home.get("y", 0)))
+		var distance := Vector2(local_position.x, local_position.z).distance_to(Vector2(point.x, point.z))
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest_kind = "home"
+			nearest_id = str(home.get("id", ""))
+	if nearest_kind == "work" and nearest_distance <= 7.0:
+		_send_message({"type": "work", "job": nearest_id})
+	elif nearest_kind == "home" and nearest_distance <= 9.0:
+		if room_state.get("homes", {}).has(nearest_id):
+			_send_message({"type": "enter", "home": nearest_id})
+		else:
+			_send_message({"type": "buy", "home": nearest_id})
+
+func _send_message(message: Dictionary) -> void:
+	if socket != null and socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		socket.send_text(JSON.stringify(message))
 
 func _handle_message(message: Dictionary) -> void:
 	match str(message.get("type", "")):
@@ -113,6 +151,8 @@ func _handle_message(message: Dictionary) -> void:
 				if remote_id.is_empty():
 					continue
 				present[remote_id] = true
+				if remote_id == player_id:
+					local_inside = str(player.get("inside", ""))
 				var name := str(player.get("name", "Player"))
 				var world_position := _server_position_to_world(float(player.get("x", 800.0)), float(player.get("y", 550.0)))
 				var yaw := float(player.get("yaw", 0.0))
