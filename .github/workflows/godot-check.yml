@@ -61,10 +61,12 @@ jobs:
         run: |
           docker run --detach --name two-keys-online-smoke --publish 10000:10000 two-keys-online
           trap 'docker stop two-keys-online-smoke >/dev/null 2>&1 || true' EXIT
+          ready=0
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:10000/health >/dev/null; then break; fi
+            if curl --fail --silent http://127.0.0.1:10000/health >/dev/null; then ready=1; break; fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then docker logs two-keys-online-smoke; exit 1; fi
           curl --fail --silent http://127.0.0.1:10000/health | grep -q '"status":"ok"'
           curl --fail --silent http://127.0.0.1:10000/index.js >/dev/null
           docker exec -i two-keys-online-smoke python - <<'PY'
