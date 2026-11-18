@@ -6,30 +6,27 @@
 radius = 0.38
 height = 1.8
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape_player"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
 radius = 0.38
 height = 1.8
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1")
-floor_snap_length = 0.25
-safe_margin = 0.02
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
 
 [node name="Body" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.9, 0)
 mesh = SubResource("CapsuleMesh_player")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-position = Vector3(0, 0.9, 0)
-shape = SubResource("CapsuleShape_player")
-
 [node name="CameraPivot" type="Node3D" parent="."]
 position = Vector3(0, 1.55, 0)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot"]
-spring_length = 5.0
-margin = 0.15
+spring_length = 4.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D"]
 current = true
-fov = 72.0
+

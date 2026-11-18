@@ -11,6 +11,7 @@ var room_input: LineEdit
 var join_button: Button
 var hud_layer: CanvasLayer
 var room_label: Label
+var look_button: Button
 
 func _ready() -> void:
     _create_world()
@@ -189,6 +190,19 @@ func _create_menu() -> void:
     controls.text = "WASD move  |  Mouse look  |  Space jump  |  E work/buy/enter  |  Esc release mouse"
     controls.position = Vector2(20, 50)
     hud_layer.add_child(controls)
+    look_button = Button.new()
+    look_button.text = "CLICK TO LOOK AROUND"
+    look_button.set_anchors_preset(Control.PRESET_CENTER)
+    look_button.position = Vector2(-105, 90)
+    look_button.pressed.connect(_capture_mouse)
+    hud_layer.add_child(look_button)
+
+func _process(_delta: float) -> void:
+    if is_instance_valid(look_button):
+        look_button.visible = hud_layer.visible and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
+
+func _capture_mouse() -> void:
+    Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _create_city() -> void:
     join_button.disabled = true
@@ -204,7 +218,7 @@ func _update_status(message: String) -> void:
         menu_layer.visible = false
         hud_layer.visible = true
         room_label.text = "TOM&JAIN CITY  |  ROOM " + Network.room_code + "  |  SHARE THIS CODE"
-        Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     else:
         join_button.disabled = false
 
