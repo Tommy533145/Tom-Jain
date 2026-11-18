@@ -32,11 +32,22 @@ In the game, keep the server URL as `ws://127.0.0.1:8000/ws`. One partner select
 
 Jobs pay coins, and completing the same kind of job together grants a couple bonus. Homes and décor are shared by the room. The Python server checks purchases, job rewards, movement rate, and city collisions.
 
-## Play online
+## Play online (free self-hosted demo)
 
-Run the Python service on a public WebSocket host and set the Godot URL to `wss://your-host/ws`. Render's Docker Blueprint is included as a starting point. For saves to survive redeploys, mount persistent storage and set `TWO_KEYS_DATA_DIR` to its path.
+The Python server can serve the Godot browser build and multiplayer WebSocket from one address.
 
-A temporary public demo may use a Cloudflare Quick Tunnel, but the URL only works while the host computer and tunnel process remain online.
+1. From the repository's latest successful **Godot validation and exports** GitHub Actions run, download the `Tom-Jain-Windows-and-Web` artifact and extract its `web` folder into `game/static/game`.
+2. Start the Python server from the repository root:
+   ```powershell
+   uvicorn game.server:app --host 127.0.0.1 --port 8000
+   ```
+3. In a second terminal, start a free Cloudflare Quick Tunnel:
+   ```powershell
+   cloudflared tunnel --url http://127.0.0.1:8000
+   ```
+4. Open the printed `https://…trycloudflare.com` URL. The browser game automatically connects to the matching secure WebSocket address. Create a city and share the room code with your partner.
+
+Keep both terminal windows and the host PC online while playing. Quick Tunnel URLs are temporary and change when the tunnel restarts. If the URL shows server instructions instead of the game, the Web export is missing from `game/static/game`.
 
 ## Saves
 
