@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
@@ -98,7 +98,7 @@ app = FastAPI(title="Two Keys, One City")
 
 
 @app.get("/")
-async def index() -> FileResponse | HTMLResponse:
+async def index() -> Response:
     game_index = WEB_DIR / "index.html"
     if game_index.is_file():
         return FileResponse(game_index)
