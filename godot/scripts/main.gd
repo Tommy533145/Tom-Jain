@@ -235,7 +235,11 @@ func _build_ui() -> void:
     layout.add_child(name_input)
     url_input = LineEdit.new()
     url_input.placeholder_text = "Python server WebSocket URL"
-    url_input.text = "ws://127.0.0.1:8000/ws"
+    if OS.has_feature("web"):
+        var origin := str(JavaScriptBridge.eval("window.location.origin"))
+        url_input.text = origin.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
+    else:
+        url_input.text = "ws://127.0.0.1:8000/ws"
     layout.add_child(url_input)
     room_input = LineEdit.new()
     room_input.placeholder_text = "Partner's 8-character room code"

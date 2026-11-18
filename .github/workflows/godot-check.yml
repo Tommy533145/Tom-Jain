@@ -49,3 +49,39 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 14
+
+  build-full-stack-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build Python server and embedded Godot Web client
+        run: docker build --tag two-keys-online .
+      - name: Smoke test web client and multiplayer endpoint
+        run: |
+          docker run --detach --name two-keys-online-smoke --publish 10000:10000 two-keys-online
+          trap 'docker stop two-keys-online-smoke >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:10000/health >/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then docker logs two-keys-online-smoke; exit 1; fi
+          curl --fail --silent http://127.0.0.1:10000/health | grep -q '"status":"ok"'
+          curl --fail --silent http://127.0.0.1:10000/index.js >/dev/null
+          docker exec -i two-keys-online-smoke python - <<'PY'
+          import asyncio
+          import json
+          import secrets
+          import websockets
+
+          async def check_websocket():
+              async with websockets.connect("ws://127.0.0.1:10000/ws") as socket:
+                  await socket.send(json.dumps({"type": "create", "name": "Smoke", "account": secrets.token_hex(24)}))
+                  welcome = json.loads(await socket.recv())
+                  state = json.loads(await socket.recv())
+                  assert welcome["type"] == "welcome", welcome
+                  assert state["type"] == "state", state
+
+          asyncio.run(check_websocket())
+          PY
