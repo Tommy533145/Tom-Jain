@@ -1,116 +1,141 @@
 extends Node
 
-signal room_joined(room_code: String, player_id: String)
-signal state_received(state: Dictionary)
+signal player_spawned(player_id: String, player_name: String, spawn_position: Vector3)
+signal player_removed(player_id: String)
+signal player_name_changed(player_id: String, player_name: String)
+signal player_state_received(player_id: String, pos: Vector3, yaw: float)
 signal status_changed(message: String)
-signal server_error(message: String)
+signal room_state_received(state: Dictionary)
 
-var socket := WebSocketPeer.new()
+const CITY_WIDTH := 1600.0
+const CITY_HEIGHT := 1100.0
+
+var socket: WebSocketPeer
+var request: Dictionary = {}
+var request_sent := false
 var player_display_name := "Player"
 var player_id := ""
 var room_code := ""
+var known_players: Dictionary = {}
+var room_state: Dictionary = {}
 var account_key := ""
-var pending_action := ""
-var pending_room := ""
-var connected_once := false
-var connect_attempt := false
-var last_move_sent := 0.0
-const MOVE_SEND_INTERVAL := 1.0 / 15.0
 
 func _ready() -> void:
-    var config := ConfigFile.new()
-    if config.load("user://profile.cfg") == OK:
-        account_key = str(config.get_value("profile", "account_key", ""))
-    if account_key.length() < 20:
-        account_key = Crypto.new().generate_random_bytes(24).hex_encode()
-        config.set_value("profile", "account_key", account_key)
-        config.save("user://profile.cfg")
+	var config := ConfigFile.new()
+	if config.load("user://two_keys.cfg") == OK:
+		account_key = str(config.get_value("account", "key", ""))
+	if account_key.length() < 20:
+		account_key = Crypto.new().generate_random_bytes(24).hex_encode()
+	config.set_value("account", "key", account_key)
+	config.save("user://two_keys.cfg")
 
 func _process(_delta: float) -> void:
-    socket.poll()
-    var ready := socket.get_ready_state()
-    if ready == WebSocketPeer.STATE_OPEN:
-        if not connected_once:
-            connected_once = true
-            _send({
-                "type": pending_action,
-                "room": pending_room,
-                "name": player_display_name,
-                "account": account_key,
-            })
-        while socket.get_available_packet_count() > 0:
-            var packet := socket.get_packet().get_string_from_utf8()
-            var parsed = JSON.parse_string(packet)
-            if typeof(parsed) != TYPE_DICTIONARY:
-                continue
-            _handle_message(parsed)
-    elif ready == WebSocketPeer.STATE_CLOSED and connected_once:
-        connected_once = false
-        status_changed.emit("Disconnected from the city.")
-    elif ready == WebSocketPeer.STATE_CLOSED and connect_attempt:
-        connect_attempt = false
-        status_changed.emit("Connection failed. Check the server URL.")
+	if socket == null:
+		return
+	socket.poll()
+	var state := socket.get_ready_state()
+	if state == WebSocketPeer.STATE_OPEN and not request_sent:
+		var error := socket.send_text(JSON.stringify(request))
+		if error != OK:
+			status_changed.emit("Could not start the city connection.")
+			return
+		request_sent = true
+	elif state == WebSocketPeer.STATE_CLOSED:
+		if not player_id.is_empty():
+			status_changed.emit("Connection lost. Reload the game to reconnect.")
+			_clear_players()
+		player_id = ""
+		return
+	while socket.get_ready_state() == WebSocketPeer.STATE_OPEN and socket.get_available_packet_count() > 0:
+		var packet := socket.get_packet().get_string_from_utf8()
+		var message: Variant = JSON.parse_string(packet)
+		if message is Dictionary:
+			_handle_message(message)
 
-func connect_to_city(url: String, action: String, room: String, display_name: String) -> void:
-    if socket.get_ready_state() != WebSocketPeer.STATE_CLOSED:
-        socket.close()
-        socket = WebSocketPeer.new()
-    player_display_name = display_name.strip_edges().substr(0, 20)
-    if player_display_name.is_empty():
-        player_display_name = "Player"
-    pending_action = action
-    pending_room = room.strip_edges().to_upper()
-    room_code = ""
-    player_id = ""
-    connected_once = false
-    connect_attempt = true
-    var error := socket.connect_to_url(url.strip_edges())
-    if error != OK:
-        connect_attempt = false
-        status_changed.emit("Could not connect: " + error_string(error))
-        return
-    status_changed.emit("Connecting to your city…")
+func default_server_url() -> String:
+	if OS.has_feature("web"):
+		var location: String = JavaScriptBridge.eval("window.location.protocol + '//' + window.location.host")
+		if location.begins_with("https://"):
+			return "wss://" + location.trim_prefix("https://") + "/ws"
+		return "ws://" + location.trim_prefix("http://") + "/ws"
+	return "ws://127.0.0.1:8001/ws"
 
-func disconnect_from_city() -> void:
-    if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
-        socket.close()
-    connected_once = false
+func connect_to_server(url: String, player_name: String, code: String = "") -> void:
+	var clean_url := url.strip_edges()
+	if clean_url.is_empty():
+		clean_url = default_server_url()
+	player_display_name = player_name.strip_edges().substr(0, 20)
+	if player_display_name.is_empty():
+		player_display_name = "Player"
+	room_code = code.strip_edges().to_upper()
+	request = {
+		"type": "join" if not room_code.is_empty() else "create",
+		"name": player_display_name,
+		"account": account_key,
+	}
+	if not room_code.is_empty():
+		request["room"] = room_code
+	request_sent = false
+	player_id = ""
+	_clear_players()
+	socket = WebSocketPeer.new()
+	var error := socket.connect_to_url(clean_url)
+	if error != OK:
+		status_changed.emit("Could not connect: " + error_string(error))
+		socket = null
+		return
+	status_changed.emit("Connecting to the city...")
 
-func send_move(city_x: float, city_z: float, yaw: float) -> void:
-    if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
-        return
-    var now := Time.get_ticks_msec() / 1000.0
-    if now - last_move_sent < MOVE_SEND_INTERVAL:
-        return
-    last_move_sent = now
-    _send({"type": "move", "x": city_x, "y": city_z, "yaw": yaw})
-
-func send_action(action: String, value: String = "") -> void:
-    var payload := {"type": action}
-    if not value.is_empty():
-        if action == "work":
-            payload["job"] = value
-        elif action in ["buy", "enter"]:
-            payload["home"] = value
-        elif action == "decorate":
-            payload["item"] = value
-    _send(payload)
-
-func _send(payload: Dictionary) -> void:
-    if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
-        socket.send_text(JSON.stringify(payload))
+func send_player_state(pos: Vector3, yaw: float) -> void:
+	if socket == null or socket.get_ready_state() != WebSocketPeer.STATE_OPEN or player_id.is_empty():
+		return
+	var message := {
+		"type": "move",
+		"x": (pos.x + 90.0) / 180.0 * CITY_WIDTH,
+		"y": (pos.z + 90.0) / 180.0 * CITY_HEIGHT,
+		"yaw": yaw,
+	}
+	socket.send_text(JSON.stringify(message))
 
 func _handle_message(message: Dictionary) -> void:
-    match str(message.get("type", "")):
-        "welcome":
-            room_code = str(message.get("room", ""))
-            player_id = str(message.get("player", ""))
-            connect_attempt = false
-            room_joined.emit(room_code, player_id)
-            status_changed.emit("Connected to city " + room_code)
-        "state":
-            state_received.emit(message)
-            if message.has("notice") and typeof(message["notice"]) == TYPE_DICTIONARY:
-                status_changed.emit(str(message["notice"].get("text", "")))
-        "error":
-            server_error.emit(str(message.get("message", "The server rejected that action.")))
+	match str(message.get("type", "")):
+		"welcome":
+			player_id = str(message.get("player", ""))
+			room_code = str(message.get("room", ""))
+			status_changed.emit("Connected | Room " + room_code)
+		"state":
+			room_state = message
+			var present: Dictionary = {}
+			for player in message.get("players", []):
+				if not player is Dictionary:
+					continue
+				var remote_id := str(player.get("id", ""))
+				if remote_id.is_empty():
+					continue
+				present[remote_id] = true
+				var name := str(player.get("name", "Player"))
+				var world_position := _server_position_to_world(float(player.get("x", 800.0)), float(player.get("y", 550.0)))
+				var yaw := float(player.get("yaw", 0.0))
+				if not known_players.has(remote_id):
+					known_players[remote_id] = name
+					player_spawned.emit(remote_id, name, world_position)
+				elif str(known_players[remote_id]) != name:
+					known_players[remote_id] = name
+					player_name_changed.emit(remote_id, name)
+				player_state_received.emit(remote_id, world_position, yaw)
+			for existing_id in known_players.keys():
+				if not present.has(existing_id):
+					known_players.erase(existing_id)
+					player_removed.emit(str(existing_id))
+			room_state_received.emit(room_state)
+		"error":
+			status_changed.emit(str(message.get("message", "The server rejected the request.")))
+
+func _server_position_to_world(x: float, y: float) -> Vector3:
+	return Vector3(x / CITY_WIDTH * 180.0 - 90.0, 1.0, y / CITY_HEIGHT * 180.0 - 90.0)
+
+func _clear_players() -> void:
+	for existing_id in known_players.keys():
+		player_removed.emit(str(existing_id))
+	known_players.clear()
+
