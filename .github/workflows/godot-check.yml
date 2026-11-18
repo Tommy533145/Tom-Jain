@@ -50,6 +50,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload browser-only build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tom-Jain-Web
+          path: dist/web/
+          if-no-files-found: error
+          retention-days: 14
+
   build-full-stack-container:
     runs-on: ubuntu-latest
     steps:
